@@ -46,10 +46,9 @@ export default async function HomePage() {
   return (
     <>
       {/* ── Hero ───────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-grid">
-        <div className="blob left-[-6rem] top-[-4rem] h-72 w-72 animate-blob bg-brand/40" />
-        <div className="blob right-[-4rem] top-10 h-72 w-72 animate-blob bg-accent/40 [animation-delay:3s]" />
-        <div className="blob bottom-[-6rem] left-1/3 h-72 w-72 animate-blob bg-accent-pink/30 [animation-delay:6s]" />
+      <section className="relative">
+        <div className="blob left-1/4 -top-16 h-72 w-72 animate-blob bg-brand/40" />
+        <div className="blob right-1/4 -top-10 h-80 w-80 animate-blob bg-accent/40 [animation-delay:3s]" />
 
         <div className="container relative py-20 text-center sm:py-28">
           <span className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-white/70 px-4 py-1.5 text-sm font-semibold text-brand backdrop-blur">

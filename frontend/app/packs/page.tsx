@@ -14,9 +14,9 @@ export default async function PacksPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden bg-grid">
-        <div className="blob left-[-4rem] top-[-3rem] h-60 w-60 animate-blob bg-brand/40" />
-        <div className="blob right-[-3rem] top-6 h-60 w-60 animate-blob bg-accent/40 [animation-delay:4s]" />
+      <section className="relative">
+        <div className="blob left-1/3 -top-12 h-60 w-60 animate-blob bg-brand/40" />
+        <div className="blob right-1/3 -top-8 h-60 w-60 animate-blob bg-accent/40 [animation-delay:4s]" />
         <div className="container relative py-16 text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-white/70 px-4 py-1.5 text-sm font-semibold text-brand backdrop-blur">
             🔥 Grab-and-go lead lists

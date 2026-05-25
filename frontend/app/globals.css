@@ -36,8 +36,8 @@ body {
   .blob {
     position: absolute;
     border-radius: 9999px;
-    filter: blur(64px);
-    opacity: 0.55;
+    filter: blur(72px);
+    opacity: 0.38;
     pointer-events: none;
   }
 }

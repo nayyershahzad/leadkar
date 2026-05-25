@@ -24,20 +24,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen flex-col bg-white">
-        {/* Faint runner watermark filling the side gutters — branded, non-intrusive. */}
-        <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      <body className="flex min-h-screen flex-col overflow-x-clip bg-white">
+        {/* Large runner watermark + dotted texture behind everything (branded canvas). */}
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-grid">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-mark.png"
             alt=""
-            className="absolute -left-28 top-40 w-[26rem] max-w-none rotate-[-8deg] opacity-[0.04]"
+            className="absolute -right-44 -top-24 w-[62rem] max-w-none -scale-x-100 rotate-6 opacity-[0.06]"
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-mark.png"
             alt=""
-            className="absolute -right-32 top-[60%] w-[34rem] max-w-none -scale-x-100 rotate-[8deg] opacity-[0.05]"
+            className="absolute -left-52 bottom-[-8rem] w-[50rem] max-w-none rotate-[-6deg] opacity-[0.05]"
           />
         </div>
 
