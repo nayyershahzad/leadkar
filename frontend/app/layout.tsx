@@ -25,6 +25,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="flex min-h-screen flex-col bg-white">
+        {/* Faint runner watermark filling the side gutters — branded, non-intrusive. */}
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-mark.png"
+            alt=""
+            className="absolute -left-28 top-40 w-[26rem] max-w-none rotate-[-8deg] opacity-[0.04]"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-mark.png"
+            alt=""
+            className="absolute -right-32 top-[60%] w-[34rem] max-w-none -scale-x-100 rotate-[8deg] opacity-[0.05]"
+          />
+        </div>
+
         <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center" aria-label="LeadKar home">
@@ -51,9 +67,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        <main className="flex-1">{children}</main>
+        <main className="relative z-10 flex-1">{children}</main>
 
-        <footer className="mt-10 bg-ink text-slate-300">
+        <footer className="relative z-10 mt-10 bg-ink text-slate-300">
           <div className="container flex flex-col items-center justify-between gap-3 py-10 sm:flex-row">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}

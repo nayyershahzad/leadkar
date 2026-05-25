@@ -116,7 +116,7 @@ export function CustomOrderForm() {
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <Button type="submit" size="lg" disabled={loading} className="w-full">
+      <Button type="submit" variant="gradient" size="lg" disabled={loading} className="w-full">
         {loading ? "Redirecting to payment…" : "Continue to payment"}
       </Button>
     </form>
