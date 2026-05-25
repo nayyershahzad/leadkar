@@ -1,12 +1,8 @@
-import hashlib
-import hmac
-
 import httpx
 import pytest
 
 from app.config import settings
 from app.integrations.paypro import (
-    SIGNATURE_HEADER,
     PayProAuthError,
     PayProClient,
     PayProError,
@@ -37,74 +33,131 @@ class FakeRedis:
 
 def _client(handler) -> PayProClient:
     transport = httpx.MockTransport(handler)
-    http = httpx.AsyncClient(transport=transport, base_url="https://paypro.test")
+    http = httpx.AsyncClient(transport=transport, base_url="https://demoapi.paypro.com.pk")
     return PayProClient(redis_client=FakeRedis(), http_client=http)
 
 
-# ---- token caching ---------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _paypro_env(monkeypatch):
+    monkeypatch.setattr(settings, "PAYPRO_API_BASE_URL", "https://demoapi.paypro.com.pk")
+    monkeypatch.setattr(settings, "PAYPRO_USERNAME", "Engs_Tech")
+    monkeypatch.setattr(settings, "PAYPRO_CLIENT_ID", "cid")
+    monkeypatch.setattr(settings, "PAYPRO_CLIENT_SECRET", "csecret")
 
 
-async def test_token_is_cached_after_first_fetch():
-    calls = {"token": 0}
+# ---- token: returned in a response header, then cached ---------------------
+
+
+async def test_token_from_header_is_cached():
+    calls = {"auth": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/auth/token":
-            calls["token"] += 1
-            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        if request.url.path == "/v2/ppro/auth":
+            calls["auth"] += 1
+            return httpx.Response(200, headers={"token": "TKN"}, json=[{"Status": "00"}])
         return httpx.Response(404)
 
     client = _client(handler)
-    assert await client.get_access_token() == "tok"
-    assert await client.get_access_token() == "tok"
-    assert calls["token"] == 1  # second call served from cache
+    assert await client.get_access_token() == "TKN"
+    assert await client.get_access_token() == "TKN"
+    assert calls["auth"] == 1  # second call served from cache
 
 
-# ---- create_invoice: success / failure / 401 / timeout ---------------------
+async def test_auth_missing_token_header_raises():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[{"Status": "00"}])  # no token header
+
+    with pytest.raises(PayProError):
+        await _client(handler).get_access_token()
+
+
+# ---- create_invoice: array body -> Click2Pay / PayProId --------------------
 
 
 async def test_create_invoice_success():
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/auth/token":
-            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
-        if request.url.path == "/invoices":
+        if request.url.path == "/v2/ppro/auth":
+            return httpx.Response(200, headers={"token": "TKN"}, json=[{"Status": "00"}])
+        if request.url.path == "/v2/ppro/co":
+            assert request.headers["token"] == "TKN"
             return httpx.Response(
-                200, json={"id": "inv_42", "payment_url": "https://pay.test/inv_42"}
+                200,
+                json=[
+                    {"Status": "00"},
+                    {"PayProId": "01102205600001", "Click2Pay": "https://pay.pk/x"},
+                ],
             )
         return httpx.Response(404)
 
-    invoice = await _client(handler).create_invoice(
-        order_id="o1",
+    inv = await _client(handler).create_invoice(
+        order_id="o-1",
         amount_pkr=3999,
         customer_email="a@b.com",
         customer_name="A",
         customer_phone="03001234567",
-        description="Karachi Restaurants pack",
-        return_url="https://leadkar.pk/order/success",
-        cancel_url="https://leadkar.pk/order/pending",
+        description="pack",
     )
-    assert invoice.invoice_id == "inv_42"
-    assert invoice.payment_url == "https://pay.test/inv_42"
+    assert inv.invoice_id == "01102205600001"
+    assert inv.payment_url == "https://pay.pk/x"
 
 
-async def test_create_invoice_server_error_raises():
+async def test_create_invoice_nonzero_envelope_status_raises():
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/auth/token":
-            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
-        return httpx.Response(500, text="boom")
+        if request.url.path == "/v2/ppro/auth":
+            return httpx.Response(200, headers={"token": "TKN"}, json=[{"Status": "00"}])
+        return httpx.Response(200, json=[{"Status": "01"}])  # invalid data
 
     with pytest.raises(PayProError):
-        await _client(handler)._request("POST", "https://paypro.test/invoices")
+        await _client(handler).create_invoice(
+            order_id="o-1",
+            amount_pkr=3999,
+            customer_email="a@b.com",
+            customer_name="A",
+            customer_phone=None,
+            description="pack",
+        )
 
 
-async def test_auth_401_raises_auth_error():
+async def test_auth_refresh_then_retry_on_401():
+    state = {"auth": 0, "co_401_done": False}
+
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(401, json={"error": "unauthorized"})
+        if request.url.path == "/v2/ppro/auth":
+            state["auth"] += 1
+            return httpx.Response(200, headers={"token": f"TKN{state['auth']}"}, json=[{"Status": "00"}])
+        if request.url.path == "/v2/ppro/co":
+            if not state["co_401_done"]:
+                state["co_401_done"] = True
+                return httpx.Response(401)
+            return httpx.Response(
+                200, json=[{"Status": "00"}, {"PayProId": "P1", "Click2Pay": "https://pay/x"}]
+            )
+        return httpx.Response(404)
 
-    with pytest.raises(PayProAuthError):
-        await _client(handler).get_access_token()
+    inv = await _client(handler).create_invoice(
+        order_id="o-1", amount_pkr=100, customer_email="a@b.com",
+        customer_name="A", customer_phone=None, description="d",
+    )
+    assert inv.invoice_id == "P1"
+    assert state["auth"] == 2  # token refreshed after the 401
 
 
-async def test_timeout_raises_paypro_timeout():
+# ---- status via ggosboi ----------------------------------------------------
+
+
+async def test_get_invoice_status_paid():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v2/ppro/auth":
+            return httpx.Response(200, headers={"token": "TKN"}, json=[{"Status": "00"}])
+        if request.url.path == "/v2/ppro/ggosboi":
+            return httpx.Response(200, json=[{"Status": "00"}, {"OrderStatus": "PAID"}])
+        return httpx.Response(404)
+
+    st = await _client(handler).get_invoice_status("o-1")
+    assert st.is_paid is True and st.is_failed is False
+
+
+async def test_timeout_raises():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.TimeoutException("slow")
 
@@ -116,35 +169,8 @@ async def test_timeout_raises_paypro_timeout():
 
 
 def test_classify_status():
-    assert classify_status("paid") == (True, False)
-    assert classify_status("SUCCESS") == (True, False)
-    assert classify_status("cancelled") == (False, True)
-    assert classify_status("pending") == (False, False)
+    assert classify_status("PAID") == (True, False)
+    assert classify_status("blocked") == (False, True)
+    assert classify_status("expired") == (False, True)
+    assert classify_status("UNPAID") == (False, False)
     assert classify_status(None) == (False, False)
-
-
-# ---- webhook signature -----------------------------------------------------
-
-
-def test_verify_webhook_signature_valid(monkeypatch):
-    monkeypatch.setattr(settings, "PAYPRO_WEBHOOK_SECRET", "s3cret")
-    body = b'{"event_id":"e1","status":"paid"}'
-    sig = hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
-    client = PayProClient(redis_client=FakeRedis(), http_client=httpx.AsyncClient())
-    assert client.verify_webhook_signature(body, {SIGNATURE_HEADER: sig}) is True
-    # case-insensitive header + sha256= prefix tolerated
-    assert client.verify_webhook_signature(body, {"X-PayPro-Signature": f"sha256={sig}"}) is True
-
-
-def test_verify_webhook_signature_invalid(monkeypatch):
-    monkeypatch.setattr(settings, "PAYPRO_WEBHOOK_SECRET", "s3cret")
-    body = b'{"event_id":"e1","status":"paid"}'
-    client = PayProClient(redis_client=FakeRedis(), http_client=httpx.AsyncClient())
-    assert client.verify_webhook_signature(body, {SIGNATURE_HEADER: "deadbeef"}) is False
-    assert client.verify_webhook_signature(body, {}) is False  # missing header
-
-
-def test_verify_webhook_signature_no_secret_fails_closed(monkeypatch):
-    monkeypatch.setattr(settings, "PAYPRO_WEBHOOK_SECRET", "")
-    client = PayProClient(redis_client=FakeRedis(), http_client=httpx.AsyncClient())
-    assert client.verify_webhook_signature(b"{}", {SIGNATURE_HEADER: "x"}) is False

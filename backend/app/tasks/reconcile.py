@@ -36,7 +36,8 @@ async def _reconcile() -> int:
 
         for order in stale:
             try:
-                status = await client.get_invoice_status(order.paypro_invoice_id)
+                # PayPro keys status by our OrderNumber (== order.id), not PayProId.
+                status = await client.get_invoice_status(str(order.id))
             except Exception as exc:  # noqa: BLE001 — log and continue per order
                 logger.warning("Reconcile failed for order {}: {}", order.id, exc)
                 continue

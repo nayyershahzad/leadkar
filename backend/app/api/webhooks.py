@@ -1,4 +1,11 @@
-"""PayPro webhook endpoint (CLAUDE.md §7 webhook handler flow)."""
+"""PayPro callback endpoint (CLAUDE.md §7, adapted for PayPro Pakistan).
+
+PayPro PK does not sign callbacks, so we trust nothing in the request body: the
+callback is only a trigger to re-query PayPro's status API (ggosboi). An order is
+marked paid ONLY when PayPro itself reports OrderStatus=PAID (Nayyer's decision,
+2026-05-25). The 15-minute reconciliation task is the backstop if a callback is
+never delivered.
+"""
 
 from __future__ import annotations
 
@@ -11,16 +18,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.integrations.paypro import (
-    PayProClient,
-    classify_status,
-    extract_webhook_fields,
-)
+from app.integrations.paypro import PayProClient, PayProError
 from app.models.order import Order, OrderStatus
 from app.models.paypro_event import PayProEvent
-from app.tasks.celery_app import celery_app
 
 router = APIRouter()
+
+# Field names PayPro might use to identify the order in a callback. We match our
+# OrderNumber (== our order_id) first, then fall back to PayProId.
+_ORDER_NUMBER_KEYS = ("OrderNumber", "order_number", "Order_Id", "orderid", "OrderId")
+_PAYPRO_ID_KEYS = ("PayProId", "payproid", "cpayId", "cpayid")
 
 
 @router.post("/webhooks/paypro")
@@ -28,91 +35,106 @@ async def paypro_webhook(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    raw_body = await request.body()
-    headers = dict(request.headers)
+    payload = await _parse_body(request)
 
-    client = PayProClient()
-    valid = client.verify_webhook_signature(raw_body, headers)
+    # Locate our order from whatever identifier the callback carries.
+    order = await _match_order(session, payload)
 
-    # Step 2: reject unsigned / invalid-signature webhooks with 401, but record
-    # the attempt. Unverified payloads are untrusted, so we store no event_id
-    # (avoids polluting the dedup index with attacker-supplied ids).
-    if not valid:
-        logger.warning(
-            "Rejected PayPro webhook with invalid signature from {}",
-            request.client.host if request.client else "unknown",
-        )
-        session.add(
-            PayProEvent(
-                payload=_safe_json(raw_body),
-                signature_valid=False,
-                processed=False,
-            )
-        )
-        await session.commit()
-        return Response(status_code=401)
-
-    payload = _safe_json(raw_body)
-    fields = extract_webhook_fields(payload)
-
-    # Step 4: dedup — if we've already processed this event, ack immediately.
-    if fields.event_id:
-        existing = await session.scalar(
-            select(PayProEvent).where(
-                PayProEvent.paypro_event_id == fields.event_id,
-                PayProEvent.processed.is_(True),
-            )
-        )
-        if existing:
-            return Response(status_code=200)
-
-    # Step 3: record the verified event.
     event = PayProEvent(
-        paypro_event_id=fields.event_id,
-        event_type=fields.event_type,
+        paypro_event_id=_first(payload, _ORDER_NUMBER_KEYS + _PAYPRO_ID_KEYS),
+        event_type="callback",
         payload=payload,
-        signature_valid=True,
+        signature_valid=False,  # set True once verified via PayPro's status API
         processed=False,
     )
     session.add(event)
 
-    # Step 5: match the order.
-    order: Order | None = None
-    if fields.invoice_id:
-        order = await session.scalar(
-            select(Order).where(Order.paypro_invoice_id == fields.invoice_id)
-        )
+    if order is None:
+        logger.warning("PayPro callback for unrecognized order: {}", payload)
+        event.processed = True
+        await session.commit()
+        return Response(status_code=200)  # ack; reconciliation will catch real ones
 
-    if order is not None:
-        event.order_id = order.id
-        is_paid, is_failed = classify_status(fields.status)
+    event.order_id = order.id
+
+    # Authoritative check: ask PayPro directly. Never trust the callback body.
+    try:
+        status = await PayProClient().get_invoice_status(str(order.id))
+    except PayProError as exc:
+        # PayPro unreachable/auth issue — ack and let reconciliation retry.
+        logger.warning("PayPro status check failed for order {}: {}", order.id, exc)
+        event.processed = True
+        await session.commit()
+        return Response(status_code=200)
+    event.signature_valid = status.raw != {}  # we reached PayPro and got a result
+
+    if order.status == OrderStatus.pending:
         now = datetime.now(timezone.utc)
-
-        # Steps 6/7: idempotent state transitions from `pending` only.
-        if is_paid and order.status == OrderStatus.pending:
+        if status.is_paid:
             order.status = OrderStatus.paid
             order.paid_at = now
-            # Step 6: kick off delivery (deliver_order is implemented in Phase 4).
-            celery_app.send_task("deliver_order", args=[str(order.id)])
-        elif is_failed and order.status == OrderStatus.pending:
-            order.status = OrderStatus.failed
-            order.failed_reason = f"PayPro status: {fields.status}"
-    else:
-        logger.warning(
-            "PayPro webhook for unknown invoice_id={}", fields.invoice_id
-        )
+            # deliver_order is implemented in Phase 4.
+            from app.tasks.celery_app import celery_app
 
-    # Step 8: mark processed. Whole handler is one transaction (step retry-safety).
+            celery_app.send_task("deliver_order", args=[str(order.id)])
+        elif status.is_failed:
+            order.status = OrderStatus.failed
+            order.failed_reason = f"PayPro status: {status.status}"
+
     event.processed = True
     await session.commit()
-
-    # Step 9.
     return Response(status_code=200)
 
 
-def _safe_json(raw_body: bytes) -> dict:
+async def _parse_body(request: Request) -> dict:
+    """PayPro may post JSON or urlencoded; handle both without python-multipart."""
+    raw = await request.body()
+    ctype = request.headers.get("content-type", "")
+    text = (raw or b"").decode("utf-8", "replace")
+
+    if "application/x-www-form-urlencoded" in ctype:
+        from urllib.parse import parse_qsl
+
+        return dict(parse_qsl(text))
+
+    # Default to JSON; fall back to urlencoded if it looks like a query string.
     try:
-        data = json.loads(raw_body or b"{}")
+        data = json.loads(text or "{}")
         return data if isinstance(data, dict) else {"_raw": data}
     except (ValueError, TypeError):
-        return {"_unparseable": raw_body.decode("utf-8", "replace")[:2000]}
+        from urllib.parse import parse_qsl
+
+        parsed = dict(parse_qsl(text))
+        return parsed or {"_unparseable": text[:2000]}
+
+
+async def _match_order(session: AsyncSession, payload: dict) -> Order | None:
+    order_number = _first(payload, _ORDER_NUMBER_KEYS)
+    if order_number:
+        order = await session.scalar(
+            select(Order).where(Order.id == _as_uuid(order_number))
+        )
+        if order:
+            return order
+    paypro_id = _first(payload, _PAYPRO_ID_KEYS)
+    if paypro_id:
+        return await session.scalar(
+            select(Order).where(Order.paypro_invoice_id == str(paypro_id))
+        )
+    return None
+
+
+def _first(payload: dict, keys: tuple[str, ...]) -> str | None:
+    for k in keys:
+        if payload.get(k):
+            return str(payload[k])
+    return None
+
+
+def _as_uuid(value: str):
+    import uuid
+
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError):
+        return uuid.UUID(int=0)  # non-matching sentinel

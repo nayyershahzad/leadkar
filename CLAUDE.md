@@ -43,10 +43,14 @@ These are inviolable. Violation requires explicit Nayyer override.
 4. **Secrets live in `.env` only.** Never commit `.env`. Never log secrets.
    Never echo secrets in error responses or webhook handlers.
 
-5. **PayPro webhook signatures MUST verify.** Reject unsigned or
-   signature-invalid webhooks with HTTP 401 and log the attempt. Never mark
-   an order paid from any source other than a verified PayPro webhook (or a
-   manual admin action with audit trail).
+5. **Never mark an order paid from an unverified source.** PayPro Pakistan does
+   NOT sign webhooks (confirmed against their v2 docs, 2026-05-25), so the
+   original "verify webhook signature / reject 401" rule is superseded by:
+   treat any PayPro callback as a trigger only and confirm payment with a
+   server-to-server status query (`/v2/ppro/ggosboi`) — mark `paid` ONLY when
+   PayPro reports `OrderStatus=PAID`. The 15-min reconciliation task is the
+   backstop. Manual admin actions still require an audit trail. (Approved by
+   Nayyer, 2026-05-25.)
 
 6. **Apify spend is real money.** Every actor invocation must:
    - Pre-check estimated cost vs `APIFY_MAX_USD_PER_RUN` and abort if over.
@@ -399,12 +403,28 @@ CREATE UNIQUE INDEX idx_paypro_events_dedup
 
 ## 7. PayPro Integration
 
-**Note to Claude Code:** PayPro v2 exact endpoint paths and request schemas
-are **not specified here** because they may change. Consult the official
-PayPro v2 API documentation provided by Nayyer (or `PAYPRO_API_BASE_URL`
-+ their developer portal). Wrap all PayPro interaction inside
-`app/integrations/paypro.py` so endpoint specifics are isolated to one
-module.
+> **CONFIRMED PAYPRO PK v2 SPEC (2026-05-25) — supersedes the generic guidance
+> below where they conflict.** Reconciled from the official Postman collection.
+>
+> - **Bases:** demo `https://demoapi.paypro.com.pk`, live `https://api.paypro.com.pk`.
+> - **Auth:** `POST /v2/ppro/auth` body `{clientid, clientsecret}`; token returned
+>   in the **`token` response header** (no documented expiry → cache + refresh-on-401).
+> - **Create order:** `POST /v2/ppro/co`, header `token`; body is a 2-element array
+>   `[{MerchantId}, {OrderNumber, CurrencyAmount, Currency, IsConverted, OrderType,
+>   IssueDate, OrderDueDate, CustomerName/Email/Mobile/Address, ...}]`. Response
+>   array → `PayProId` (→ `paypro_invoice_id`) and `Click2Pay` (payment URL).
+>   Envelope element 0 `{"Status":"00"}` = success. `OrderNumber` = our `order.id`.
+> - **Status:** `POST /v2/ppro/ggosboi`, header `Token`, body `{userName, Order_Id}`;
+>   `Order_Id` is our OrderNumber. Response field `OrderStatus` (`PAID` = paid).
+> - **Webhooks:** PayPro PK does **not** sign or document a webhook — see Rule #5.
+>   `verify_webhook_signature` is removed; payment is confirmed via the status API.
+> - **Auth needs a username:** `PAYPRO_USERNAME` (MerchantId, e.g. `Engs_Tech`).
+> - PKR amount mapping (`CurrencyAmount`/`IsConverted=false`) has no doc example;
+>   confirm on the first real sandbox order.
+
+**Note to Claude Code:** the original generic interface below predates the
+confirmed spec. Wrap all PayPro interaction inside `app/integrations/paypro.py`
+so endpoint specifics stay isolated to one module.
 
 The wrapper must expose this interface regardless of underlying details:
 
@@ -817,16 +837,27 @@ Before starting Phase 1, confirm:
 
 1. **Domain**: `leadkar.pk` or another name (DataKaar, LeadMandi, ListBaaz, Kaarobar Leads)?
 2. **VPS**: new Hetzner instance or co-host on an existing one? Which?
-3. **PayPro API base URL**: exact value (e.g. `https://api.paypro.com.pk/v2`)?
-4. **PayPro sandbox**: do you have sandbox credentials separate from production?
+3. ~~PayPro API base URL~~ **RESOLVED (2026-05-25):** demo `https://demoapi.paypro.com.pk`,
+   live `https://api.paypro.com.pk`.
+4. ~~PayPro sandbox~~ **RESOLVED:** sandbox uses the demo base + the same
+   client id/secret; merchant `Engs_Tech`. Creds live in `.env` on the VPS.
 5. **Email provider**: Brevo, Hetzner SMTP, or other?
 6. **S3 bucket**: existing Hetzner bucket to reuse, or create new `leadkar-deliverables`?
-7. **PayPro webhook signature scheme**: HMAC-SHA256 vs other? (per their docs)
+7. ~~PayPro webhook signature scheme~~ **RESOLVED:** PayPro PK does not sign
+   webhooks. Payment is verified server-to-server via `/v2/ppro/ggosboi` (Rule #5).
 
 ---
 
 ## 15. Change Log
 
+- `2026-05-25` — PayPro reconciled to the real PK v2 spec (Postman collection):
+  token-in-header auth, array create-order (`/v2/ppro/co` → `PayProId`/`Click2Pay`),
+  status via `/v2/ppro/ggosboi`. PayPro PK has no signed webhooks, so HMAC
+  verification was removed and the callback now only triggers a server-to-server
+  status check before marking paid (Rule #5 amended; Nayyer-approved). Added
+  `PAYPRO_USERNAME`; base set to demo `https://demoapi.paypro.com.pk`. 15 unit
+  tests pass; callback acks JSON + urlencoded. **Live `create_invoice` smoke test
+  pending Nayyer adding client id/secret to `.env`.**
 - `2026-05-25` — Phase 2 (PayPro integration) implemented: `PayProClient`
   (§7 interface) with Redis-cached OAuth token (SET NX EX lock), HMAC-SHA256
   webhook verification, the 9-step `/api/webhooks/paypro` handler (idempotent,

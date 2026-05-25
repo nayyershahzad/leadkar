@@ -1,52 +1,50 @@
-"""PayPro v2 integration wrapper (CLAUDE.md §7).
+"""PayPro Pakistan v2 integration wrapper (CLAUDE.md §7).
 
-ALL PayPro-specific details live in this module so the rest of the app never
-touches PayPro's vocabulary. The exact endpoint paths, request/response field
-names, signature header, and signing scheme are NOT given in CLAUDE.md (§14 open
-questions) — they are isolated in the clearly-marked block below and must be
-confirmed against the official PayPro v2 docs before going live.
+Reconciled against the official PayPro v2 Postman collection. PayPro PK does NOT
+sign webhooks, so per Nayyer's decision (2026-05-25) we never trust a callback
+body: payment is confirmed only by a server-to-server status query (ggosboi).
+All PayPro-specific details remain isolated in this module.
 """
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import hmac
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID
 
 import httpx
 from loguru import logger
 from redis.asyncio import Redis
 
 from app.config import settings
-from app.schemas.paypro import PayProInvoice, PayProInvoiceStatus, WebhookFields
+from app.schemas.paypro import PayProInvoice, PayProInvoiceStatus
 
 # ============================================================================
-# >>> PAYPRO API SPECIFICS — CONFIRM AGAINST PAYPRO v2 DOCS (CLAUDE.md §14) <<<
-# These are best-guess placeholders. When Nayyer provides the PayPro v2 docs,
-# update *only* this block; the rest of the app is insulated from it.
+# PAYPRO v2 API SPECIFICS (confirmed from the official Postman collection).
+# demo base: https://demoapi.paypro.com.pk   live base: https://api.paypro.com.pk
 # ----------------------------------------------------------------------------
-TOKEN_PATH = "/auth/token"  # TODO(§14): confirm OAuth token endpoint
-CREATE_INVOICE_PATH = "/invoices"  # TODO(§14): confirm invoice-create endpoint
-INVOICE_STATUS_PATH = "/invoices/{invoice_id}"  # TODO(§14): confirm status endpoint
+AUTH_PATH = "/v2/ppro/auth"          # POST {clientid, clientsecret}; token in header
+CREATE_ORDER_PATH = "/v2/ppro/co"    # POST [ {MerchantId}, {order...} ]; header token
+ORDER_STATUS_PATH = "/v2/ppro/ggosboi"  # POST {userName, Order_Id}; header Token
 
-# Response field names.
-F_ACCESS_TOKEN = "access_token"  # TODO(§14)
-F_EXPIRES_IN = "expires_in"  # TODO(§14)
-F_INVOICE_ID = "id"  # TODO(§14)
-F_PAYMENT_URL = "payment_url"  # TODO(§14)
-F_STATUS = "status"  # TODO(§14)
+TOKEN_HEADER = "token"               # response header carrying the auth token
 
-# Webhook payload field names + signature header.
-WH_EVENT_ID = "event_id"  # TODO(§14)
-WH_EVENT_TYPE = "event_type"  # TODO(§14)
-WH_INVOICE_ID = "invoice_id"  # TODO(§14)
-WH_STATUS = "status"  # TODO(§14)
-SIGNATURE_HEADER = "x-paypro-signature"  # TODO(§14): confirm header name
+# Create-order response fields (2nd element of the response array).
+F_CLICK2PAY = "Click2Pay"            # hosted payment URL
+F_PAYPRO_ID = "PayProId"             # PayPro's order id -> our paypro_invoice_id
 
-# Status vocabulary. TODO(§14): confirm PayPro's exact terminal status strings.
-PAID_STATUSES = {"paid", "success", "completed", "successful"}
-FAILED_STATUSES = {"failed", "cancelled", "canceled", "expired", "declined"}
+# Status (ggosboi) response field + values.
+F_ORDER_STATUS = "OrderStatus"
+PAID_STATUSES = {"paid"}
+FAILED_STATUSES = {"blocked", "expired", "cancelled", "canceled"}
+
+# PayPro envelope status: element 0 is {"Status": "00"} on success.
+F_ENVELOPE_STATUS = "Status"
+OK_STATUS = "00"
+# TODO(confirm on first sandbox order): no PKR example in the docs — we send
+# Currency=PKR, IsConverted=false, amount in CurrencyAmount.
+ORDER_TYPE = "Service"
 # ============================================================================
 
 _TOKEN_KEY = "paypro:access_token"
@@ -54,35 +52,43 @@ _LOCK_KEY = "paypro:access_token:lock"
 
 
 class PayProError(RuntimeError):
-    """Generic PayPro failure (non-2xx, malformed response, etc.)."""
+    """Generic PayPro failure (non-2xx, non-'00' envelope, malformed response)."""
 
 
 class PayProAuthError(PayProError):
-    """PayPro returned 401/403."""
+    """PayPro returned 401/403 (token rejected/expired)."""
 
 
 class PayProTimeout(PayProError):
     """PayPro request timed out."""
 
 
-def classify_status(status: str | None) -> tuple[bool, bool]:
-    """Map a PayPro status string to (is_paid, is_failed)."""
-    s = (status or "").strip().lower()
+def classify_status(order_status: str | None) -> tuple[bool, bool]:
+    """Map a PayPro OrderStatus to (is_paid, is_failed)."""
+    s = (order_status or "").strip().lower()
     return (s in PAID_STATUSES, s in FAILED_STATUSES)
 
 
-def extract_webhook_fields(payload: dict[str, Any]) -> WebhookFields:
-    """Pull the fields we care about out of a PayPro webhook body."""
-    return WebhookFields(
-        event_id=payload.get(WH_EVENT_ID),
-        event_type=payload.get(WH_EVENT_TYPE),
-        invoice_id=payload.get(WH_INVOICE_ID),
-        status=payload.get(WH_STATUS),
-    )
+def _envelope(payload: Any) -> tuple[bool, dict[str, Any]]:
+    """PayPro responses are arrays: [{"Status": "00"}, {data...}].
+
+    Returns (ok, data_dict).
+    """
+    if isinstance(payload, list) and payload:
+        status = str(payload[0].get(F_ENVELOPE_STATUS, "")) if isinstance(payload[0], dict) else ""
+        data = payload[1] if len(payload) > 1 and isinstance(payload[1], dict) else {}
+        return status == OK_STATUS, data
+    if isinstance(payload, dict):
+        return str(payload.get(F_ENVELOPE_STATUS, "")) == OK_STATUS, payload
+    return False, {}
+
+
+def _ddmmyyyy(dt: datetime) -> str:
+    return dt.strftime("%d/%m/%Y")
 
 
 class PayProClient:
-    """Async PayPro v2 client with Redis-cached OAuth token (CLAUDE.md §7)."""
+    """Async PayPro v2 client with Redis-cached token (CLAUDE.md §7)."""
 
     def __init__(
         self,
@@ -96,6 +102,9 @@ class PayProClient:
         self._http = http_client
 
     # ---- HTTP plumbing -----------------------------------------------------
+
+    def _url(self, path: str) -> str:
+        return settings.PAYPRO_API_BASE_URL.rstrip("/") + path
 
     async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         timeout = settings.PAYPRO_TIMEOUT_SECONDS
@@ -111,37 +120,30 @@ class PayProClient:
         if resp.status_code in (401, 403):
             raise PayProAuthError(f"PayPro auth failed ({resp.status_code})")
         if resp.status_code >= 400:
-            raise PayProError(
-                f"PayPro error {resp.status_code}: {resp.text[:300]}"
-            )
+            raise PayProError(f"PayPro error {resp.status_code}: {resp.text[:300]}")
         return resp
-
-    def _url(self, path: str) -> str:
-        return settings.PAYPRO_API_BASE_URL.rstrip("/") + path
 
     # ---- Token caching (CLAUDE.md §7) --------------------------------------
 
-    async def _fetch_token(self) -> tuple[str, int]:
+    async def _fetch_token(self) -> str:
         resp = await self._request(
             "POST",
-            self._url(TOKEN_PATH),
+            self._url(AUTH_PATH),
             json={
-                "client_id": settings.PAYPRO_CLIENT_ID,
-                "client_secret": settings.PAYPRO_CLIENT_SECRET,
-                "grant_type": "client_credentials",
+                "clientid": settings.PAYPRO_CLIENT_ID,
+                "clientsecret": settings.PAYPRO_CLIENT_SECRET,
             },
         )
-        data = resp.json()
-        token = data.get(F_ACCESS_TOKEN)
+        # Token is returned in a response header (case-insensitive lookup).
+        token = resp.headers.get(TOKEN_HEADER) or resp.headers.get(TOKEN_HEADER.title())
         if not token:
-            raise PayProError("PayPro token response missing access token")
-        return token, int(data.get(F_EXPIRES_IN, 3600))
+            raise PayProError("PayPro auth response missing token header")
+        return token
 
     async def get_access_token(self) -> str:
-        """Return a cached or freshly-minted token. Redis TTL = expires_in - 60s.
-
-        Uses SET NX EX as a refresh lock to avoid a thundering herd of token
-        requests when the cache is cold.
+        """Return a cached or fresh token. PayPro documents no expiry, so we cache
+        for PAYPRO_TOKEN_TTL_SECONDS and additionally refresh-on-401 (see _authed).
+        SET NX EX is used as a refresh lock to avoid a thundering herd.
         """
         cached = await self._redis.get(_TOKEN_KEY)
         if cached:
@@ -149,110 +151,103 @@ class PayProClient:
 
         got_lock = await self._redis.set(_LOCK_KEY, "1", nx=True, ex=30)
         if not got_lock:
-            # Another worker is refreshing — wait briefly for it to populate.
             for _ in range(20):
+                import asyncio
+
                 await asyncio.sleep(0.25)
                 cached = await self._redis.get(_TOKEN_KEY)
                 if cached:
                     return cached
-
         try:
-            token, expires_in = await self._fetch_token()
-            ttl = max(expires_in - 60, 30)
-            await self._redis.set(_TOKEN_KEY, token, ex=ttl)
+            token = await self._fetch_token()
+            await self._redis.set(_TOKEN_KEY, token, ex=settings.PAYPRO_TOKEN_TTL_SECONDS)
             return token
         finally:
             await self._redis.delete(_LOCK_KEY)
 
-    async def _auth_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {await self.get_access_token()}"}
+    async def _authed(self, method: str, path: str, body: Any) -> Any:
+        """Token-authenticated request that refreshes once on auth failure."""
+        token = await self.get_access_token()
+        try:
+            resp = await self._request(
+                method, self._url(path), json=body, headers={TOKEN_HEADER: token}
+            )
+        except PayProAuthError:
+            await self._redis.delete(_TOKEN_KEY)
+            token = await self.get_access_token()
+            resp = await self._request(
+                method, self._url(path), json=body, headers={TOKEN_HEADER: token}
+            )
+        return resp.json()
 
-    # ---- Invoices (CLAUDE.md §7) -------------------------------------------
+    # ---- Orders (CLAUDE.md §7) ---------------------------------------------
 
     async def create_invoice(
         self,
         *,
-        order_id: Any,
+        order_id: UUID | str,
         amount_pkr: int,
         customer_email: str,
         customer_name: str,
         customer_phone: str | None,
         description: str,
-        return_url: str,
-        cancel_url: str,
+        return_url: str | None = None,  # PayPro PK has no per-order return/cancel
+        cancel_url: str | None = None,  # URLs; configured at the dashboard level.
     ) -> PayProInvoice:
-        """Create a PayPro invoice and return its id + hosted payment URL."""
-        payload = {
-            # TODO(§14): map to PayPro's exact request schema.
-            "order_id": str(order_id),
-            "amount": amount_pkr,
-            "currency": "PKR",
-            "customer_email": customer_email,
-            "customer_name": customer_name,
-            "customer_phone": customer_phone,
-            "description": description,
-            "return_url": return_url,
-            "cancel_url": cancel_url,
-        }
-        resp = await self._request(
-            "POST",
-            self._url(CREATE_INVOICE_PATH),
-            json=payload,
-            headers=await self._auth_headers(),
-        )
-        data = resp.json()
-        invoice_id = data.get(F_INVOICE_ID)
-        payment_url = data.get(F_PAYMENT_URL)
-        if not invoice_id or not payment_url:
-            raise PayProError("PayPro invoice response missing id/payment_url")
-        return PayProInvoice(invoice_id=str(invoice_id), payment_url=payment_url, raw=data)
+        """Create a PayPro order (/v2/ppro/co). OrderNumber = our order_id."""
+        now = datetime.now(timezone.utc)
+        order_number = str(order_id)
+        body = [
+            {"MerchantId": settings.PAYPRO_USERNAME},
+            {
+                "OrderNumber": order_number,
+                "CurrencyAmount": str(amount_pkr),
+                "Currency": "PKR",
+                "IsConverted": "false",
+                "OrderType": ORDER_TYPE,
+                "IssueDate": _ddmmyyyy(now),
+                "OrderDueDate": _ddmmyyyy(now + timedelta(days=settings.PAYPRO_ORDER_DUE_DAYS)),
+                "OrderExpireAfterSeconds": "0",
+                "CustomerName": customer_name,
+                "CustomerMobile": customer_phone or "",
+                "CustomerEmail": customer_email,
+                "CustomerAddress": "",
+            },
+        ]
+        data = await self._authed("POST", CREATE_ORDER_PATH, body)
+        ok, fields = _envelope(data)
+        if not ok:
+            raise PayProError(f"PayPro create order failed: {data}")
 
-    async def get_invoice_status(self, invoice_id: str) -> PayProInvoiceStatus:
-        """Fetch an invoice's status — the reconciliation backup path."""
-        resp = await self._request(
-            "GET",
-            self._url(INVOICE_STATUS_PATH.format(invoice_id=invoice_id)),
-            headers=await self._auth_headers(),
-        )
-        data = resp.json()
-        status = data.get(F_STATUS)
+        invoice_id = fields.get(F_PAYPRO_ID)
+        payment_url = fields.get(F_CLICK2PAY)
+        if not invoice_id or not payment_url:
+            raise PayProError(f"PayPro response missing PayProId/Click2Pay: {fields}")
+        return PayProInvoice(invoice_id=str(invoice_id), payment_url=payment_url, raw=fields)
+
+    async def get_invoice_status(self, order_number: str) -> PayProInvoiceStatus:
+        """Server-to-server payment verification via ggosboi.
+
+        NOTE: PayPro keys this by the merchant OrderNumber (our order_id), not by
+        PayProId. This is the authoritative paid-check (CLAUDE.md §7 / Rule #5).
+        """
+        body = {"userName": settings.PAYPRO_USERNAME, "Order_Id": order_number}
+        data = await self._authed("POST", ORDER_STATUS_PATH, body)
+        ok, fields = _envelope(data)
+        status = fields.get(F_ORDER_STATUS) if ok else None
         is_paid, is_failed = classify_status(status)
         return PayProInvoiceStatus(
-            invoice_id=invoice_id,
+            invoice_id=order_number,
             status=str(status),
             is_paid=is_paid,
             is_failed=is_failed,
-            raw=data,
+            raw=fields,
         )
 
-    # ---- Webhook signature (CLAUDE.md §7) ----------------------------------
-
-    def verify_webhook_signature(
-        self, raw_body: bytes, headers: dict[str, str]
-    ) -> bool:
-        """HMAC-SHA256 verification of the raw request body.
-
-        TODO(§14): confirm the signing scheme. If PayPro uses RSA or a different
-        digest, replace this body — callers only depend on the bool return.
-        Fails closed: no secret or missing/invalid signature -> False.
-        """
-        secret = settings.PAYPRO_WEBHOOK_SECRET
-        if not secret:
-            logger.warning("PAYPRO_WEBHOOK_SECRET not set; rejecting webhook")
+    async def is_order_paid(self, order_number: str) -> bool:
+        """Convenience wrapper used by the webhook + reconciliation paths."""
+        try:
+            return (await self.get_invoice_status(order_number)).is_paid
+        except PayProError as exc:
+            logger.warning("PayPro status check failed for {}: {}", order_number, exc)
             return False
-
-        # Header lookup is case-insensitive.
-        provided = ""
-        for key, value in headers.items():
-            if key.lower() == SIGNATURE_HEADER:
-                provided = value.strip()
-                break
-        if not provided:
-            return False
-
-        expected = hmac.new(
-            secret.encode("utf-8"), raw_body, hashlib.sha256
-        ).hexdigest()
-        # Tolerate "sha256=" prefixes some providers use.
-        provided_norm = provided.split("=", 1)[-1] if "=" in provided else provided
-        return hmac.compare_digest(expected, provided_norm.lower())
