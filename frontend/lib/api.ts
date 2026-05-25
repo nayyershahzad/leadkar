@@ -24,8 +24,9 @@ export interface OrderCreateResponse {
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${API_INTERNAL_URL}/api${path}`, {
-    // Catalog changes rarely; revalidate periodically.
-    next: { revalidate: 60 },
+    // Render fresh per request — the backend isn't reachable at build time, and
+    // catalog content must reflect the DB immediately.
+    cache: "no-store",
   });
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status}`);
@@ -39,7 +40,7 @@ export function listPacks(): Promise<Pack[]> {
 
 export async function getPack(slug: string): Promise<Pack | null> {
   const res = await fetch(`${API_INTERNAL_URL}/api/packs/${encodeURIComponent(slug)}`, {
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`API /packs/${slug} failed: ${res.status}`);
