@@ -19,9 +19,9 @@ invoicegraph), not the dedicated VPS assumed in CLAUDE.md §11. Consequently:
 
 - **Postgres** and **Redis** run docker-internal only (no published host ports —
   5432/5433 and 6379/6380/6381 are already taken by other projects).
-- The **backend** publishes on host port `8001` and the **frontend** on `3001`
-  (defaults 8000/3000 are in use). See `BACKEND_HOST_PORT` / `FRONTEND_HOST_PORT`
-  in `.env`.
+- The **backend** publishes on host port `8002` and the **frontend** on `3002`
+  (8000/8001 and 3000/3001 are all in use by other projects). See
+  `BACKEND_HOST_PORT` / `FRONTEND_HOST_PORT` in `.env`.
 - There is **no nginx container**; the existing **host nginx** reverse-proxies
   `leadkar.pk` to those ports (config to be added in Phase 8).
 
@@ -30,5 +30,15 @@ during Phase 0 assessment.
 
 ## Status
 
-**Phase 0 — Documentation & Scaffolding.** No application code yet. See CLAUDE.md §9
-for the phase plan and acceptance criteria.
+**Phase 1 — Infra & Database (complete).** Docker Compose runs postgres, redis,
+backend (FastAPI `/health`), worker, and beat; Alembic `0001_initial` applies the
+full §6 schema. See CLAUDE.md §9 for the phase plan and acceptance criteria.
+
+### Local operations
+
+```bash
+docker compose up -d                                   # start the stack
+curl http://127.0.0.1:8002/health                      # -> {"status":"ok"}
+docker compose exec backend alembic upgrade head       # apply migrations
+docker compose exec backend celery -A app.tasks.celery_app inspect ping
+```

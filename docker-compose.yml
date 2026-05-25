@@ -1,14 +1,13 @@
-# LeadKar — Docker Compose (Phase 0 stubs)
-#
-# Service definitions are scaffolded here but the `backend`/`frontend` builds will
-# NOT succeed until Phase 1 adds backend/Dockerfile, frontend/Dockerfile, and app
-# code. `postgres` and `redis` are functional now.
+# LeadKar — Docker Compose (Phase 1: infra & database)
 #
 # Shared-host adaptations (see README + CLAUDE.md §11):
 #   - postgres/redis are docker-internal only (no published host ports).
 #   - backend/frontend publish on 127.0.0.1 at BACKEND_HOST_PORT/FRONTEND_HOST_PORT
 #     (default 8001/3001) so the existing HOST nginx can reverse-proxy them.
 #   - No nginx service here; host nginx terminates TLS and proxies leadkar.pk.
+#
+# backend, worker, and beat share the same image built from ./backend.
+# frontend remains a Phase 6 stub behind the "frontend" profile.
 
 name: leadkar
 
@@ -29,7 +28,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # No host port published — reach it via `docker compose exec postgres psql`.
     # To debug from the host, uncomment (5432/5433 are taken, so use 5434):
     # ports:
     #   - "127.0.0.1:5434:5432"
@@ -47,14 +45,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # No host port published (6379/6380/6381 are taken). Debug via:
     # ports:
     #   - "127.0.0.1:6382:6379"
 
-  # --- The services below are Phase 1 stubs; build contexts don't exist yet. ---
-
   backend:
-    # Phase 1: build from ./backend (python:3.11-slim).
+    image: leadkar-backend
     build:
       context: ./backend
     restart: unless-stopped
@@ -68,36 +63,59 @@ services:
       - leadkar
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8001}:8000"
-    profiles: ["app"]   # excluded from default `up` until Phase 1
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   worker:
-    # Phase 1: same image as backend, runs `celery -A app.tasks.celery_app worker`.
+    image: leadkar-backend
     build:
       context: ./backend
     restart: unless-stopped
     command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
     env_file: .env
     depends_on:
-      - backend
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - leadkar
-    profiles: ["app"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*worker' > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   beat:
-    # Phase 1: Celery beat for reconciliation + quarterly catalog refresh.
+    image: leadkar-backend
     build:
       context: ./backend
     restart: unless-stopped
     command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
     env_file: .env
     depends_on:
-      - backend
+      redis:
+        condition: service_healthy
     networks:
       - leadkar
-    profiles: ["app"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
-    # Phase 6: build from ./frontend (Next.js 14).
+    # Phase 6: build from ./frontend (Next.js 14). Stubbed until then.
     build:
       context: ./frontend
     restart: unless-stopped
@@ -106,7 +124,7 @@ services:
       - leadkar
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-3001}:3000"
-    profiles: ["app"]
+    profiles: ["frontend"]
 
 volumes:
   leadkar_pgdata:

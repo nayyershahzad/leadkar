@@ -761,12 +761,12 @@ on the frontend.
   15 GiB RAM, 150 GB disk). LeadKar co-hosts with `nexus`, `forestwatch`, and
   `invoicegraph` — this is **not** the dedicated box originally assumed. Capacity
   is adequate (~9.7 GiB RAM and ~108 GB disk free at assessment time).
-- **Port allocation (shared-host)**: host ports 8000/3000 (backend/frontend),
-  5432/5433 (postgres), 6379/6380/6381 (redis), and 80/443 (nginx) are already
-  occupied by other projects. Therefore:
+- **Port allocation (shared-host)**: host ports 8000 **and 8001** (backend),
+  3000 **and 3001** (frontend), 5432/5433 (postgres), 6379/6380/6381 (redis),
+  and 80/443 (nginx) are already occupied by other projects. Therefore:
   - Postgres and Redis run **docker-internal only** (no published host ports);
     the app reaches them by compose service name (`postgres`/`redis`).
-  - Backend publishes on `127.0.0.1:8001`, frontend on `127.0.0.1:3001`
+  - Backend publishes on `127.0.0.1:8002`, frontend on `127.0.0.1:3002`
     (`BACKEND_HOST_PORT` / `FRONTEND_HOST_PORT` in `.env`).
   - **No nginx container.** The existing **host nginx** terminates TLS and
     reverse-proxies `leadkar.pk` to the two localhost ports (config in Phase 8).
@@ -827,6 +827,10 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 1 (infra & database) implemented and verified: compose
+  stack (postgres/redis/backend/worker/beat) healthy, FastAPI `/health`, async
+  SQLAlchemy models, Alembic `0001_initial` applied, Celery no-op task. Backend/
+  frontend host ports moved to 8002/3002 (8001/3001 were also occupied).
 - `2026-05-25` — §11 updated to reflect the shared Hetzner host (204.168.178.28,
   co-hosted with nexus/forestwatch/invoicegraph): internal-only postgres/redis,
   backend/frontend on 8001/3001, host nginx as reverse proxy. Recorded during
