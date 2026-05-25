@@ -34,6 +34,11 @@ during Phase 0 assessment.
 backend (FastAPI `/health`), worker, and beat; Alembic `0001_initial` applies the
 full §6 schema.
 
+**Phase 4 — Catalog order flow (code complete; live happy-path pends PayPro).**
+`GET /api/packs`, `GET /api/packs/{slug}`, `POST /api/orders/catalog` (upsert
+customer → idempotent order → PayPro invoice → payment_url), and the idempotent
+`deliver_order` task (S3 presigned CSV+XLSX → branded email). 22 tests pass.
+
 **Phase 2 — PayPro integration (code complete; go-live pending).** `PayProClient`
 (token cache, create_invoice, get_invoice_status, webhook signature verify), the
 idempotent `/api/webhooks/paypro` handler, and the 15-min reconciliation task. The

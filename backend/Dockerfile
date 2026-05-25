@@ -25,7 +25,9 @@ RUN pip install \
     "loguru" \
     "httpx" \
     "apify-client" \
-    "openpyxl"
+    "openpyxl" \
+    "boto3" \
+    "email-validator"
 
 # Application code + migration tooling.
 COPY app ./app

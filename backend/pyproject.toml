@@ -20,6 +20,8 @@ dependencies = [
   "httpx",
   "apify-client",
   "openpyxl",
+  "boto3",
+  "email-validator",
 ]
 
 [project.optional-dependencies]

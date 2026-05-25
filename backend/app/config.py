@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # App
     APP_NAME: str = "leadkar"
+    APP_BASE_URL: str = "https://leadkar.pk"
     ENVIRONMENT: str = "production"
     SECRET_KEY: str = ""
 
@@ -42,6 +43,22 @@ class Settings(BaseSettings):
     PAYPRO_TIMEOUT_SECONDS: int = 20
     PAYPRO_TOKEN_TTL_SECONDS: int = 1500  # no documented expiry; refresh-on-401 too
     PAYPRO_ORDER_DUE_DAYS: int = 7
+
+    # Hetzner Object Storage (S3 API)
+    S3_ENDPOINT: str = ""
+    S3_REGION: str = "fsn1"
+    S3_BUCKET: str = "leadkar-deliverables"
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_PRESIGNED_URL_TTL_HOURS: int = 72
+
+    # Email (SMTP)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "noreply@leadkar.pk"
+    SMTP_FROM_NAME: str = "LeadKar"
 
     # Apify
     APIFY_API_TOKEN: str = ""

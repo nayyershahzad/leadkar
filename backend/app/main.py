@@ -2,12 +2,14 @@
 
 from fastapi import FastAPI
 
-from app.api import webhooks
+from app.api import orders, packs, webhooks
 from app.config import settings
 
 app = FastAPI(title=settings.APP_NAME)
 
-# Mounted under /api so the route is /api/webhooks/paypro (CLAUDE.md §7).
+# All API routes are mounted under /api (CLAUDE.md §3/§4).
+app.include_router(packs.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")
 app.include_router(webhooks.router, prefix="/api")
 
 

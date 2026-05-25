@@ -850,6 +850,14 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 4 (catalog order flow) implemented: `GET /api/packs`,
+  `GET /api/packs/{slug}`, `POST /api/orders/catalog` (upsert customer →
+  idempotent order → PayPro create_invoice → returns payment_url), `deliver_order`
+  Celery task (presign pack CSV+XLSX from S3 → branded email → mark delivered,
+  idempotent), plus S3 (`storage.py`) and SMTP (`email.py`) integrations. 22 tests
+  pass (incl. integration against the live DB with PayPro/S3/SMTP stubbed). Live
+  happy-path (real payment_url + email) still pends PayPro Bill-Creation
+  entitlement (the create_invoice call is the same one used here).
 - `2026-05-25` — PayPro reconciled to the real PK v2 spec (Postman collection):
   token-in-header auth, array create-order (`/v2/ppro/co` → `PayProId`/`Click2Pay`),
   status via `/v2/ppro/ggosboi`. PayPro PK has no signed webhooks, so HMAC
