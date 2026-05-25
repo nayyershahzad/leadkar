@@ -835,7 +835,9 @@ The following are deferred. Do not implement in Phase 1 even if tempted:
 
 Before starting Phase 1, confirm:
 
-1. **Domain**: `leadkar.pk` or another name (DataKaar, LeadMandi, ListBaaz, Kaarobar Leads)?
+1. ~~Domain~~ **RESOLVED (2026-05-25):** live at **`leadkar.engstech.com`** (subdomain
+   of the existing Engstech domain, DNS A record in cPanel → VPS). `leadkar.pk`
+   remains a possible future rename.
 2. **VPS**: new Hetzner instance or co-host on an existing one? Which?
 3. ~~PayPro API base URL~~ **RESOLVED (2026-05-25):** demo `https://demoapi.paypro.com.pk`,
    live `https://api.paypro.com.pk`.
@@ -850,6 +852,14 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — **Went live at `https://leadkar.engstech.com`.** Added a cPanel
+  DNS A record → VPS, installed the nginx vhost into the shared host nginx
+  (`/etc/nginx/sites-enabled/`), and issued a Let's Encrypt cert via
+  `certbot --nginx` (auto-renew scheduled, expires 2026-08-23). HTTP→HTTPS
+  redirect active; `/api`→backend, rest→frontend. The synced TLS vhost is in
+  `nginx/leadkar.engstech.com.conf`. Temporary `:8080` preview closed (override
+  removed + ufw rule deleted). The site is publicly browsable; checkout still
+  pends PayPro Bill-Creation, and packs are placeholder rows (no S3 files yet).
 - `2026-05-25` — Phase 8 scaffolding (deploy artifacts; no live deploy yet):
   host nginx server block (`nginx/leadkar.conf`: TLS via certbot, /api→backend:8002,
   rest→frontend:3002, static caching + security headers), Loguru file logging with

@@ -1,5 +1,9 @@
 # LeadKar
 
+**Live:** https://leadkar.engstech.com (frontend + `/api`, TLS via Let's Encrypt).
+Checkout is not yet functional — see status below.
+
+
 LeadKar is a Pakistan-focused B2B lead-generation product: Pakistani agencies, SMBs,
 and marketers buy curated, verified Google Maps business listings as off-the-shelf
 PKR-priced packs (catalog) or custom on-demand orders, delivered as CSV + XLSX via
