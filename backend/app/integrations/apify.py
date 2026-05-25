@@ -22,8 +22,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.apify_run import ApifyRun
 
-# compass/crawler-google-places bills roughly $5 per 1000 results (CLAUDE.md §8).
-UNIT_COST_PER_RESULT = Decimal("0.005")
+# Calibrated against a real run on 2026-05-25: ~$0.0083/result (20 leads → $0.166)
+# for compass/crawler-google-places with scrapeContacts + detail pages.
+UNIT_COST_PER_RESULT = Decimal("0.0085")
 
 # Apify run lifecycle terminal states.
 _TERMINAL_STATES = {"SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"}
@@ -44,6 +45,17 @@ class ApifyRunResult:
     cost_usd: Decimal | None
     dataset_id: str | None
     results_count: int | None = None
+
+
+def _get(obj: Any, *names: str) -> Any:
+    """Read a field from an Apify SDK object (snake_case attrs) or a dict."""
+    for n in names:
+        if isinstance(obj, dict):
+            if n in obj:
+                return obj[n]
+        elif hasattr(obj, n):
+            return getattr(obj, n)
+    return None
 
 
 class ApifyClient:
@@ -116,8 +128,8 @@ class ApifyClient:
         )
         started = await self.client.actor(actor_id).start(run_input=input_payload)
 
-        run_row.apify_run_id = started.get("id")
-        run_row.status = started.get("status", "RUNNING")
+        run_row.apify_run_id = _get(started, "id", "_id")
+        run_row.status = _get(started, "status") or "RUNNING"
         await self._session.commit()
         await self._session.refresh(run_row)
         return run_row
@@ -131,15 +143,15 @@ class ApifyClient:
             run = await self.client.run(apify_run_id).get()
             if run is None:
                 raise ApifyError(f"Apify run {apify_run_id} not found")
-            status = run.get("status", "")
+            status = _get(run, "status") or ""
             if status in _TERMINAL_STATES:
-                cost = run.get("usageTotalUsd")
+                cost = _get(run, "usage_total_usd", "usageTotalUsd")
                 return ApifyRunResult(
                     apify_run_id=apify_run_id,
                     status=status,
                     cost_usd=Decimal(str(cost)) if cost is not None else None,
-                    dataset_id=run.get("defaultDatasetId"),
-                    results_count=run.get("itemCount"),
+                    dataset_id=_get(run, "default_dataset_id", "defaultDatasetId"),
+                    results_count=_get(run, "item_count", "itemCount"),
                 )
             if asyncio.get_event_loop().time() >= deadline:
                 raise ApifyError(
@@ -157,7 +169,7 @@ class ApifyClient:
             page = await self.client.dataset(dataset_id).list_items(
                 offset=offset, limit=page_size
             )
-            batch = page.items
+            batch = page.items if hasattr(page, "items") else list(page)
             items.extend(batch)
             if len(batch) < page_size:
                 break

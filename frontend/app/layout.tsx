@@ -46,9 +46,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="flex items-center" aria-label="LeadKar home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logo-banner.png"
+                src="/logo-light.png"
                 alt="LeadKar"
-                className="h-9 w-auto rounded-md sm:h-10"
+                className="h-11 w-auto sm:h-12"
               />
             </Link>
             <nav className="flex items-center gap-2 sm:gap-5 text-sm font-semibold text-slate-700">
@@ -73,7 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="container flex flex-col items-center justify-between gap-3 py-10 sm:flex-row">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-banner.png" alt="LeadKar" className="h-9 w-auto rounded-md" />
+              <img src="/logo-dark.png" alt="LeadKar" className="h-11 w-auto" />
               <p className="mt-2 text-sm text-slate-400">Digitizing Pakistani sales. 🇵🇰</p>
             </div>
             <div className="flex gap-6 text-sm">

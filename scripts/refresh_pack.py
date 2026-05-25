@@ -52,21 +52,22 @@ def _write_xlsx(path: Path, rows: list[dict]) -> None:
     wb.save(path)
 
 
-async def run(slug: str, dry_run: bool) -> int:
+async def run(slug: str, dry_run: bool, count: int | None = None) -> int:
     spec = CATALOG.get(slug)
     if spec is None:
         print(f"ERROR: unknown pack slug '{slug}'. Known: {', '.join(CATALOG)}")
         return 2
 
     actor_id = settings.APIFY_ACTOR_GMAPS
-    payload = build_gmaps_input(spec.search_strings, spec.lead_count)
+    target = count or spec.lead_count
+    payload = build_gmaps_input(spec.search_strings, target)
 
     # estimate_cost is pure — safe to call without a token or DB session.
     estimate = ApifyClient().estimate_cost(actor_id, payload)
     print(f"Pack:       {spec.slug} — {spec.title}")
     print(f"Actor:      {actor_id}")
     print(f"Searches:   {spec.search_strings}")
-    print(f"Per-search: {payload['maxCrawledPlacesPerSearch']} (target {spec.lead_count})")
+    print(f"Per-search: {payload['maxCrawledPlacesPerSearch']} (target {target})")
     print(f"Estimate:   ${estimate}  (cap ${settings.APIFY_MAX_USD_PER_RUN})")
 
     if dry_run:
@@ -121,8 +122,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Refresh a LeadKar catalog pack via Apify.")
     parser.add_argument("--pack-slug", required=True, help="Catalog pack slug (see scripts/catalog.py)")
     parser.add_argument("--dry-run", action="store_true", help="Print cost estimate only; no spend.")
+    parser.add_argument("--count", type=int, default=None, help="Override target lead count.")
     args = parser.parse_args()
-    sys.exit(asyncio.run(run(args.pack_slug, args.dry_run)))
+    sys.exit(asyncio.run(run(args.pack_slug, args.dry_run, args.count)))
 
 
 if __name__ == "__main__":
