@@ -64,9 +64,10 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8001}:8000"
     volumes:
-      # CLI scripts (refresh_pack, seed_catalog) + local deliverable output.
+      # CLI scripts (refresh_pack, seed_catalog) + local deliverable output + logs.
       - ./scripts:/app/scripts:ro
       - ./data:/app/data
+      - ./logs:/app/logs
     healthcheck:
       test:
         - "CMD"
@@ -92,6 +93,8 @@ services:
         condition: service_healthy
     networks:
       - leadkar
+    volumes:
+      - ./logs:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'celery.*worker' > /dev/null || exit 1"]
       interval: 20s
@@ -111,6 +114,8 @@ services:
         condition: service_healthy
     networks:
       - leadkar
+    volumes:
+      - ./logs:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'celery.*beat' > /dev/null || exit 1"]
       interval: 20s

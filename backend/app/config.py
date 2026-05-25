@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     APP_BASE_URL: str = "https://leadkar.pk"
     ENVIRONMENT: str = "production"
     SECRET_KEY: str = ""
+    LOG_DIR: str = "/app/logs"
+
+    # Quarterly catalog refresh is OFF by default: it spends real Apify credit,
+    # so it must be explicitly enabled (Rule #6). Beat still schedules it.
+    CATALOG_REFRESH_ENABLED: bool = False
 
     # Database (required to boot)
     DATABASE_URL: str

@@ -850,6 +850,14 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 8 scaffolding (deploy artifacts; no live deploy yet):
+  host nginx server block (`nginx/leadkar.conf`: TLS via certbot, /api→backend:8002,
+  rest→frontend:3002, static caching + security headers), Loguru file logging with
+  rotation to `logs/{backend,worker,beat}.log`, quarterly `refresh_catalog` beat
+  task (OFF by default via CATALOG_REFRESH_ENABLED — spends Apify), `scripts/
+  smoke_test.sh` (4/4 pass) and `scripts/backup_db.sh` (pg_dump→S3, 14-day
+  retention). Logs dir mounted (chown 10001). Live deploy (DNS, TLS, host-nginx
+  install, real backups) pends Phase-8 execution + S3 creds.
 - `2026-05-25` — Phase 6 (frontend) implemented: Next.js 14 App Router + Tailwind
   + hand-written shadcn-style primitives. Pages: landing (hero/FAQ/pack preview),
   `/packs` grid, `/packs/[slug]` detail (sample preview + buy), `/custom` (form +

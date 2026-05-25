@@ -4,6 +4,9 @@ from fastapi import FastAPI
 
 from app.api import orders, packs, webhooks
 from app.config import settings
+from app.utils.logging import configure_logging
+
+configure_logging("backend")
 
 app = FastAPI(title=settings.APP_NAME)
 

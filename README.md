@@ -49,6 +49,12 @@ landing, `/packs`, `/packs/[slug]`, `/custom`, `/order/{success,pending}`.
 Browser → `/api` rewrite → backend; standalone Docker image on `:3002`. Image
 builds clean, all pages 200, buy/order POSTs reach the backend.
 
+**Phase 8 — Deploy scaffolding (artifacts ready; not yet deployed).**
+`nginx/leadkar.conf` (host nginx + certbot TLS, /api→backend, rest→frontend),
+Loguru rotating file logs (`logs/`), quarterly `refresh_catalog` (off by
+default), `scripts/smoke_test.sh`, `scripts/backup_db.sh` (pg_dump→S3). Live
+deploy needs DNS + TLS + S3 creds.
+
 **Phase 2 — PayPro integration (code complete; go-live pending).** `PayProClient`
 (token cache, create_invoice, get_invoice_status, webhook signature verify), the
 idempotent `/api/webhooks/paypro` handler, and the 15-min reconciliation task. The
