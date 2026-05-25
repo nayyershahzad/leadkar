@@ -31,7 +31,16 @@ CATALOG: dict[str, PackSpec] = {
             "restaurants",
             500,
             3999,
-            ["restaurants in DHA Karachi", "restaurants in Clifton Karachi"],
+            [
+                "restaurants in DHA Phase 2 Karachi",
+                "restaurants in DHA Phase 5 Karachi",
+                "restaurants in DHA Phase 6 Karachi",
+                "restaurants in DHA Phase 8 Karachi",
+                "restaurants in Khadda Market DHA Karachi",
+                "restaurants in Clifton Karachi",
+                "cafes in DHA Karachi",
+                "cafes in Clifton Karachi",
+            ],
         ),
         PackSpec(
             "karachi-dental-clinics",
@@ -40,7 +49,13 @@ CATALOG: dict[str, PackSpec] = {
             "dental_clinics",
             400,
             3999,
-            ["dental clinics in Karachi"],
+            [
+                "dental clinics in DHA Karachi",
+                "dental clinics in Clifton Karachi",
+                "dental clinics in Gulshan-e-Iqbal Karachi",
+                "dentists in North Nazimabad Karachi",
+                "orthodontists in Karachi",
+            ],
         ),
         PackSpec(
             "karachi-schools-private",
@@ -49,7 +64,13 @@ CATALOG: dict[str, PackSpec] = {
             "schools",
             600,
             4499,
-            ["private schools in Karachi"],
+            [
+                "private schools in DHA Karachi",
+                "private schools in Gulshan-e-Iqbal Karachi",
+                "private schools in North Nazimabad Karachi",
+                "schools in Clifton Karachi",
+                "montessori in Karachi",
+            ],
         ),
         PackSpec(
             "karachi-real-estate",
@@ -58,7 +79,12 @@ CATALOG: dict[str, PackSpec] = {
             "real_estate",
             500,
             4499,
-            ["real estate agencies in Karachi"],
+            [
+                "real estate agencies in DHA Karachi",
+                "real estate agencies in Clifton Karachi",
+                "property dealers in Gulshan-e-Iqbal Karachi",
+                "estate agents in Bahadurabad Karachi",
+            ],
         ),
         PackSpec(
             "lahore-salons-spas",
@@ -67,7 +93,13 @@ CATALOG: dict[str, PackSpec] = {
             "salons",
             750,
             4999,
-            ["salons in Lahore", "spas in Lahore"],
+            [
+                "salons in DHA Lahore",
+                "salons in Gulberg Lahore",
+                "beauty parlours in Johar Town Lahore",
+                "spas in Lahore",
+                "hair salons in Model Town Lahore",
+            ],
         ),
         PackSpec(
             "lahore-wedding-venues",
@@ -76,7 +108,12 @@ CATALOG: dict[str, PackSpec] = {
             "wedding",
             500,
             5499,
-            ["wedding venues in Lahore", "wedding planners in Lahore"],
+            [
+                "wedding venues in DHA Lahore",
+                "marquees in Lahore",
+                "banquet halls in Gulberg Lahore",
+                "wedding planners in Lahore",
+            ],
         ),
         PackSpec(
             "lahore-gyms-fitness",
@@ -85,7 +122,12 @@ CATALOG: dict[str, PackSpec] = {
             "gyms",
             400,
             3999,
-            ["gyms in Lahore", "fitness centers in Lahore"],
+            [
+                "gyms in DHA Lahore",
+                "gyms in Gulberg Lahore",
+                "fitness centers in Johar Town Lahore",
+                "gyms in Model Town Lahore",
+            ],
         ),
         PackSpec(
             "islamabad-real-estate",
@@ -94,7 +136,12 @@ CATALOG: dict[str, PackSpec] = {
             "real_estate",
             400,
             3999,
-            ["real estate agencies in Islamabad"],
+            [
+                "real estate agencies in F-7 Islamabad",
+                "real estate agencies in F-10 Islamabad",
+                "property dealers in Bahria Town Islamabad",
+                "estate agents in DHA Islamabad",
+            ],
         ),
         PackSpec(
             "islamabad-medical-clinics",
@@ -103,7 +150,12 @@ CATALOG: dict[str, PackSpec] = {
             "medical_clinics",
             500,
             4499,
-            ["medical clinics in Islamabad"],
+            [
+                "medical clinics in F-8 Islamabad",
+                "clinics in Blue Area Islamabad",
+                "doctors in G-11 Islamabad",
+                "medical centers in F-10 Islamabad",
+            ],
         ),
         PackSpec(
             "faisalabad-garment-mfg",
@@ -112,7 +164,12 @@ CATALOG: dict[str, PackSpec] = {
             "garment_mfg",
             300,
             5999,
-            ["garment manufacturers in Faisalabad"],
+            [
+                "garment manufacturers in Faisalabad",
+                "textile manufacturers in Faisalabad",
+                "clothing factories in Faisalabad",
+                "apparel exporters in Faisalabad",
+            ],
         ),
     ]
 }

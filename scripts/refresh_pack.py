@@ -99,6 +99,18 @@ async def run(slug: str, dry_run: bool, count: int | None = None) -> int:
         scraped_at = (run_row.started_at or datetime.now(timezone.utc)).isoformat()
         rows = normalize_dataset(items, scraped_at)
 
+        # Dedup across the broadened/overlapping searches by Google place id.
+        seen: set = set()
+        deduped = []
+        for r in rows:
+            key = r.get("google_place_id") or (r.get("name"), r.get("address"))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(r)
+        print(f"Fetched {len(rows)} rows, {len(deduped)} unique after dedup")
+        rows = deduped
+
         # Persist the audit fields.
         run_row.status = result.status
         run_row.cost_usd = result.cost_usd
