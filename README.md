@@ -44,6 +44,11 @@ customer → idempotent order → PayPro invoice → payment_url), and the idemp
 task: Apify scrape → normalize → email enrichment → S3 CSV+XLSX → deliver.
 Payment routes by order type (catalog→deliver, custom→scrape). 29 tests pass.
 
+**Phase 6 — Frontend (code complete; serves locally).** Next.js 14 + Tailwind:
+landing, `/packs`, `/packs/[slug]`, `/custom`, `/order/{success,pending}`.
+Browser → `/api` rewrite → backend; standalone Docker image on `:3002`. Image
+builds clean, all pages 200, buy/order POSTs reach the backend.
+
 **Phase 2 — PayPro integration (code complete; go-live pending).** `PayProClient`
 (token cache, create_invoice, get_invoice_status, webhook signature verify), the
 idempotent `/api/webhooks/paypro` handler, and the 15-min reconciliation task. The

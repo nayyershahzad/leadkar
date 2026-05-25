@@ -850,6 +850,16 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 6 (frontend) implemented: Next.js 14 App Router + Tailwind
+  + hand-written shadcn-style primitives. Pages: landing (hero/FAQ/pack preview),
+  `/packs` grid, `/packs/[slug]` detail (sample preview + buy), `/custom` (form +
+  live price estimate), `/order/success`, `/order/pending`. Server components fetch
+  packs via internal URL; browser order POSTs go through a `/api` → backend rewrite
+  (host nginx may route /api directly in prod). Standalone Docker image (binds
+  HOSTNAME=0.0.0.0); frontend gets no secrets. Verified: image builds (TS strict +
+  lint clean), all pages 200, detail renders price/sample, buy POST reaches backend
+  (→502 pre-PayPro-entitlement). Lighthouse/mobile checks deferred to a browser
+  run (Phase 8 / verify skill). Custom pricing constants mirror backend defaults.
 - `2026-05-25` — Phase 5 (custom order flow) implemented: `POST /api/orders/custom`
   (priced `base + per_lead*target_count`, bounded by MAX_LEADS_PER_CUSTOM_ORDER),
   `scrape_for_order` task (Apify trigger→poll→fetch→normalize→enrich→S3 CSV+XLSX→
