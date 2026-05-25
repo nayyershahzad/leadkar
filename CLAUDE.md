@@ -827,6 +827,18 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 2 (PayPro integration) implemented: `PayProClient`
+  (§7 interface) with Redis-cached OAuth token (SET NX EX lock), HMAC-SHA256
+  webhook verification, the 9-step `/api/webhooks/paypro` handler (idempotent,
+  single-transaction), 15-min reconciliation beat task, and pydantic schemas.
+  All PayPro API unknowns (paths, field names, signature header/scheme, status
+  vocab) are isolated in one flagged block in `paypro.py` pending §14 confirmation.
+  Verified: 16 unit tests pass (token caching, create_invoice success/500/401/
+  timeout, status classify, signature valid/invalid/no-secret); live webhook flow
+  exercised over HTTP with a temp secret → valid=200+paid, replay=no double-process,
+  bad-sig=401+audited. **Blocked on §14 for go-live: PayPro creds, confirmed v2
+  endpoint paths/fields, signature scheme, and sandbox for the create_invoice smoke
+  test.** `deliver_order` is enqueued by name (implemented in Phase 4).
 - `2026-05-25` — Phase 3 (Apify integration) implemented: `ApifyClient` wrapper
   (estimate/trigger/poll/fetch) with cost guard + `apify_runs` auditing, output
   normalization + PK phone/carrier tagging, shared 10-pack catalog, and

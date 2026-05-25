@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://redis:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
 
+    # PayPro v2
+    PAYPRO_CLIENT_ID: str = ""
+    PAYPRO_CLIENT_SECRET: str = ""
+    PAYPRO_API_BASE_URL: str = ""
+    PAYPRO_WEBHOOK_SECRET: str = ""
+    PAYPRO_RETURN_URL: str = ""
+    PAYPRO_CANCEL_URL: str = ""
+    PAYPRO_TIMEOUT_SECONDS: int = 20
+
     # Apify
     APIFY_API_TOKEN: str = ""
     APIFY_ACTOR_GMAPS: str = "compass/crawler-google-places"

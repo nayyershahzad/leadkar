@@ -34,11 +34,19 @@ during Phase 0 assessment.
 backend (FastAPI `/health`), worker, and beat; Alembic `0001_initial` applies the
 full §6 schema.
 
+**Phase 2 — PayPro integration (code complete; go-live pending).** `PayProClient`
+(token cache, create_invoice, get_invoice_status, webhook signature verify), the
+idempotent `/api/webhooks/paypro` handler, and the 15-min reconciliation task. The
+webhook flow (valid→paid, replay dedupe, bad-sig→401) and 16 unit tests are
+verified locally. **All PayPro API specifics are stubbed in one flagged block in
+`app/integrations/paypro.py` and need confirmation against PayPro's v2 docs (§14);
+the create_invoice smoke test needs sandbox creds.**
+
 **Phase 3 — Apify integration (code complete; live run pending).** `ApifyClient`
 wrapper with cost guard + `apify_runs` auditing, output normalization, and the
 `scripts/refresh_pack.py` CLI. The dry-run cost path and unit tests are verified;
 the live ≥400-row run is **not** run yet — it needs `APIFY_API_TOKEN` and explicit
-spend approval (Rule #6). **Phase 2 (PayPro) was skipped and still owes its work.**
+spend approval (Rule #6).
 
 See CLAUDE.md §9 for the phase plan and acceptance criteria.
 
