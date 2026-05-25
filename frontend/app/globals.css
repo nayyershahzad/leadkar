@@ -4,7 +4,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #0f172a;
+  --foreground: #0b1020;
 }
 
 html {
@@ -15,4 +15,29 @@ body {
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
+}
+
+@layer utilities {
+  /* Gradient text for headline accents. */
+  .text-gradient {
+    background-image: linear-gradient(90deg, #0b5fff 0%, #7c3aed 55%, #ec4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Soft dotted grid backdrop. */
+  .bg-grid {
+    background-image: radial-gradient(rgba(11, 95, 255, 0.08) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Blurred colour blob used behind the hero. */
+  .blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    opacity: 0.55;
+    pointer-events: none;
+  }
 }
