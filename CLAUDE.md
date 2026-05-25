@@ -827,6 +827,14 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 3 (Apify integration) implemented: `ApifyClient` wrapper
+  (estimate/trigger/poll/fetch) with cost guard + `apify_runs` auditing, output
+  normalization + PK phone/carrier tagging, shared 10-pack catalog, and
+  `scripts/refresh_pack.py`. Verified: dry-run prints estimate ($2.50 for
+  karachi-restaurants-dha) with no spend; 7 unit tests pass (normalize, estimate,
+  cost-guard abort). **Live-run acceptance (≥400 rows) is pending Nayyer's
+  `APIFY_API_TOKEN` + explicit spend approval (Rule #6).** Phase 2 (PayPro) was
+  skipped at Nayyer's direction and remains to be done.
 - `2026-05-25` — Phase 1 (infra & database) implemented and verified: compose
   stack (postgres/redis/backend/worker/beat) healthy, FastAPI `/health`, async
   SQLAlchemy models, Alembic `0001_initial` applied, Celery no-op task. Backend/

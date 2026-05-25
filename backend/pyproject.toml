@@ -18,6 +18,8 @@ dependencies = [
   "pydantic-settings",
   "loguru",
   "httpx",
+  "apify-client",
+  "openpyxl",
 ]
 
 [project.optional-dependencies]

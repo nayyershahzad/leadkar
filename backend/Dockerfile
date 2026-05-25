@@ -23,7 +23,9 @@ RUN pip install \
     "redis" \
     "pydantic-settings" \
     "loguru" \
-    "httpx"
+    "httpx" \
+    "apify-client" \
+    "openpyxl"
 
 # Application code + migration tooling.
 COPY app ./app

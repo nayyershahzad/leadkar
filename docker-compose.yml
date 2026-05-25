@@ -63,6 +63,10 @@ services:
       - leadkar
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8001}:8000"
+    volumes:
+      # CLI scripts (refresh_pack, seed_catalog) + local deliverable output.
+      - ./scripts:/app/scripts:ro
+      - ./data:/app/data
     healthcheck:
       test:
         - "CMD"

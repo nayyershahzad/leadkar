@@ -7,6 +7,8 @@ so the app can start before those credentials exist. `extra="ignore"` lets the
 full .env (CLAUDE.md §5) carry keys this model doesn't yet declare.
 """
 
+from decimal import Decimal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +29,13 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://redis:6379/0"
     CELERY_BROKER_URL: str = "redis://redis:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
+
+    # Apify
+    APIFY_API_TOKEN: str = ""
+    APIFY_ACTOR_GMAPS: str = "compass/crawler-google-places"
+    APIFY_MAX_USD_PER_RUN: Decimal = Decimal("10")
+    APIFY_DEFAULT_LANGUAGE: str = "en"
+    APIFY_TIMEOUT_SECONDS: int = 1800
 
 
 settings = Settings()

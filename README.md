@@ -32,7 +32,15 @@ during Phase 0 assessment.
 
 **Phase 1 — Infra & Database (complete).** Docker Compose runs postgres, redis,
 backend (FastAPI `/health`), worker, and beat; Alembic `0001_initial` applies the
-full §6 schema. See CLAUDE.md §9 for the phase plan and acceptance criteria.
+full §6 schema.
+
+**Phase 3 — Apify integration (code complete; live run pending).** `ApifyClient`
+wrapper with cost guard + `apify_runs` auditing, output normalization, and the
+`scripts/refresh_pack.py` CLI. The dry-run cost path and unit tests are verified;
+the live ≥400-row run is **not** run yet — it needs `APIFY_API_TOKEN` and explicit
+spend approval (Rule #6). **Phase 2 (PayPro) was skipped and still owes its work.**
+
+See CLAUDE.md §9 for the phase plan and acceptance criteria.
 
 ### Local operations
 
@@ -41,4 +49,8 @@ docker compose up -d                                   # start the stack
 curl http://127.0.0.1:8002/health                      # -> {"status":"ok"}
 docker compose exec backend alembic upgrade head       # apply migrations
 docker compose exec backend celery -A app.tasks.celery_app inspect ping
+
+# Apify: estimate a pack's scrape cost without spending
+docker compose exec backend python scripts/refresh_pack.py \
+    --pack-slug karachi-restaurants-dha --dry-run
 ```
