@@ -197,8 +197,9 @@ class PayProClient:
         """Create a PayPro order (/v2/ppro/co). OrderNumber = our order_id."""
         now = datetime.now(timezone.utc)
         order_number = str(order_id)
+        merchant_id = settings.PAYPRO_MERCHANT_ID or settings.PAYPRO_USERNAME
         body = [
-            {"MerchantId": settings.PAYPRO_USERNAME},
+            {"MerchantId": merchant_id},
             {
                 "OrderNumber": order_number,
                 "CurrencyAmount": str(amount_pkr),

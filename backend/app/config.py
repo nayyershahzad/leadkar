@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     # a server-to-server status query, so there is no webhook secret.
     PAYPRO_CLIENT_ID: str = ""
     PAYPRO_CLIENT_SECRET: str = ""
-    PAYPRO_USERNAME: str = ""  # MerchantId / userName (e.g. Engs_Tech)
+    PAYPRO_USERNAME: str = ""  # userName for status/ggosboi (login, e.g. Engs_Tech)
+    PAYPRO_MERCHANT_ID: str = ""  # MerchantId for create-order (e.g. Engstech_PKR)
     PAYPRO_API_BASE_URL: str = ""  # demo: https://demoapi.paypro.com.pk
     PAYPRO_RETURN_URL: str = ""
     PAYPRO_CANCEL_URL: str = ""
