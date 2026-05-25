@@ -48,6 +48,28 @@ services:
     # ports:
     #   - "127.0.0.1:6382:6379"
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - leadkar_miniodata:/data
+    networks:
+      - leadkar
+    # API on 9000, console on 9001 — localhost only; public S3 via host nginx.
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   backend:
     image: leadkar-backend
     build:
@@ -152,6 +174,7 @@ services:
 volumes:
   leadkar_pgdata:
   leadkar_redisdata:
+  leadkar_miniodata:
 
 networks:
   leadkar:

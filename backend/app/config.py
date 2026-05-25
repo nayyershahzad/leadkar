@@ -49,9 +49,10 @@ class Settings(BaseSettings):
     PAYPRO_TOKEN_TTL_SECONDS: int = 1500  # no documented expiry; refresh-on-401 too
     PAYPRO_ORDER_DUE_DAYS: int = 7
 
-    # Hetzner Object Storage (S3 API)
-    S3_ENDPOINT: str = ""
-    S3_REGION: str = "fsn1"
+    # Object storage (S3-compatible: MinIO now, swappable to Hetzner OS / R2).
+    S3_ENDPOINT: str = ""          # internal endpoint for uploads (e.g. http://minio:9000)
+    S3_PUBLIC_ENDPOINT: str = ""   # public endpoint for presigned download links
+    S3_REGION: str = "us-east-1"
     S3_BUCKET: str = "leadkar-deliverables"
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
