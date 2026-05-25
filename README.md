@@ -37,7 +37,12 @@ full §6 schema.
 **Phase 4 — Catalog order flow (code complete; live happy-path pends PayPro).**
 `GET /api/packs`, `GET /api/packs/{slug}`, `POST /api/orders/catalog` (upsert
 customer → idempotent order → PayPro invoice → payment_url), and the idempotent
-`deliver_order` task (S3 presigned CSV+XLSX → branded email). 22 tests pass.
+`deliver_order` task (S3 presigned CSV+XLSX → branded email).
+
+**Phase 5 — Custom order flow (code complete; live run pends PayPro + Apify).**
+`POST /api/orders/custom` (priced by target count) and the `scrape_for_order`
+task: Apify scrape → normalize → email enrichment → S3 CSV+XLSX → deliver.
+Payment routes by order type (catalog→deliver, custom→scrape). 29 tests pass.
 
 **Phase 2 — PayPro integration (code complete; go-live pending).** `PayProClient`
 (token cache, create_invoice, get_invoice_status, webhook signature verify), the

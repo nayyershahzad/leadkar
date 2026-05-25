@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.integrations.paypro import PayProClient, PayProError
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderStatus, OrderType
 from app.models.paypro_event import PayProEvent
 
 router = APIRouter()
@@ -73,10 +73,15 @@ async def paypro_webhook(
         if status.is_paid:
             order.status = OrderStatus.paid
             order.paid_at = now
-            # deliver_order is implemented in Phase 4.
+            # catalog -> deliver immediately; custom -> scrape first, then deliver.
             from app.tasks.celery_app import celery_app
 
-            celery_app.send_task("deliver_order", args=[str(order.id)])
+            task = (
+                "scrape_for_order"
+                if order.order_type == OrderType.custom
+                else "deliver_order"
+            )
+            celery_app.send_task(task, args=[str(order.id)])
         elif status.is_failed:
             order.status = OrderStatus.failed
             order.failed_reason = f"PayPro status: {status.status}"

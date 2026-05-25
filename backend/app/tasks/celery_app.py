@@ -15,7 +15,7 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     # Tasks defined outside this module are loaded here (avoids import cycles).
-    imports=("app.tasks.reconcile", "app.tasks.deliver"),
+    imports=("app.tasks.reconcile", "app.tasks.deliver", "app.tasks.scrape"),
     beat_schedule={
         # CLAUDE.md §7: reconcile missed PayPro webhooks every 15 minutes.
         "reconcile-pending-orders": {

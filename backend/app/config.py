@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "noreply@leadkar.pk"
     SMTP_FROM_NAME: str = "LeadKar"
 
+    # Custom order pricing (PKR). amount = base + per_lead * target_count.
+    # Defaults derived from §0 (PKR 4,999–12,999); confirm with Nayyer.
+    CUSTOM_ORDER_BASE_PKR: int = 4999
+    CUSTOM_ORDER_PER_LEAD_PKR: int = 3
+    MAX_LEADS_PER_CUSTOM_ORDER: int = 2500
+
     # Apify
     APIFY_API_TOKEN: str = ""
     APIFY_ACTOR_GMAPS: str = "compass/crawler-google-places"

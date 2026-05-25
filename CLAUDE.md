@@ -850,6 +850,15 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — Phase 5 (custom order flow) implemented: `POST /api/orders/custom`
+  (priced `base + per_lead*target_count`, bounded by MAX_LEADS_PER_CUSTOM_ORDER),
+  `scrape_for_order` task (Apify trigger→poll→fetch→normalize→enrich→S3 CSV+XLSX→
+  enqueue deliver), email enrichment (`enrich.py`), shared exporters, and
+  fulfillment routing by order type (catalog→deliver, custom→scrape) in the
+  webhook + reconcile. `deliver_order` now handles both types. 29 tests pass
+  (incl. scrape orchestration with Apify/S3 stubbed). Custom pricing constants
+  (base 4999, per_lead 3) are assumptions from §0 — confirm with Nayyer. Live
+  30-min end-to-end pends PayPro entitlement + APIFY_API_TOKEN.
 - `2026-05-25` — Phase 4 (catalog order flow) implemented: `GET /api/packs`,
   `GET /api/packs/{slug}`, `POST /api/orders/catalog` (upsert customer →
   idempotent order → PayPro create_invoice → returns payment_url), `deliver_order`

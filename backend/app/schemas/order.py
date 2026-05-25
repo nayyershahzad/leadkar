@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class CustomerIn(BaseModel):
@@ -12,6 +12,19 @@ class CustomerIn(BaseModel):
     name: str
     phone: str | None = None
     company: str | None = None
+
+
+class CustomSpec(BaseModel):
+    city: str
+    vertical: str
+    target_count: int = Field(gt=0)
+    notes: str | None = None
+
+
+class CustomOrderRequest(BaseModel):
+    customer: CustomerIn
+    custom_spec: CustomSpec
+    idempotency_key: str | None = None
 
 
 class CatalogOrderRequest(BaseModel):
