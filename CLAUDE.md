@@ -757,8 +757,19 @@ on the frontend.
 
 ## 11. Deployment Notes
 
-- **VPS**: existing Hetzner instance (Nayyer to confirm which — likely a
-  fresh CX22/CX32 for LeadKar, not shared with PID-Delft or NEXUS).
+- **VPS**: **shared** Hetzner instance at `204.168.178.28` (8 vCPU AMD EPYC,
+  15 GiB RAM, 150 GB disk). LeadKar co-hosts with `nexus`, `forestwatch`, and
+  `invoicegraph` — this is **not** the dedicated box originally assumed. Capacity
+  is adequate (~9.7 GiB RAM and ~108 GB disk free at assessment time).
+- **Port allocation (shared-host)**: host ports 8000/3000 (backend/frontend),
+  5432/5433 (postgres), 6379/6380/6381 (redis), and 80/443 (nginx) are already
+  occupied by other projects. Therefore:
+  - Postgres and Redis run **docker-internal only** (no published host ports);
+    the app reaches them by compose service name (`postgres`/`redis`).
+  - Backend publishes on `127.0.0.1:8001`, frontend on `127.0.0.1:3001`
+    (`BACKEND_HOST_PORT` / `FRONTEND_HOST_PORT` in `.env`).
+  - **No nginx container.** The existing **host nginx** terminates TLS and
+    reverse-proxies `leadkar.pk` to the two localhost ports (config in Phase 8).
 - **Path**: `/opt/leadkar/`.
 - **User**: run all services as non-root `leadkar` user. Docker socket access
   via docker group.
@@ -816,4 +827,8 @@ Before starting Phase 1, confirm:
 
 ## 15. Change Log
 
+- `2026-05-25` — §11 updated to reflect the shared Hetzner host (204.168.178.28,
+  co-hosted with nexus/forestwatch/invoicegraph): internal-only postgres/redis,
+  backend/frontend on 8001/3001, host nginx as reverse proxy. Recorded during
+  Phase 0 scaffolding. Author: Claude (VPS session).
 - `2026-05-25` — Initial version. Author: Claude (chat session).
