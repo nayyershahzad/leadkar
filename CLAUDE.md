@@ -843,15 +843,205 @@ Before starting Phase 1, confirm:
    live `https://api.paypro.com.pk`.
 4. ~~PayPro sandbox~~ **RESOLVED:** sandbox uses the demo base + the same
    client id/secret; merchant `Engs_Tech`. Creds live in `.env` on the VPS.
-5. **Email provider**: Brevo, Hetzner SMTP, or other?
+5. ~~Email provider~~ **RESOLVED (2026-05-26): Brevo** (free tier 300/day). SMTP
+   in `.env` (`smtp-relay.brevo.com:587`); sender = verified Gmail (temporary —
+   switch to `noreply@engstech.com` + domain auth before real launch).
 6. **S3 bucket**: existing Hetzner bucket to reuse, or create new `leadkar-deliverables`?
 7. ~~PayPro webhook signature scheme~~ **RESOLVED:** PayPro PK does not sign
    webhooks. Payment is verified server-to-server via `/v2/ppro/ggosboi` (Rule #5).
 
 ---
 
-## 15. Change Log
+## 15. Phase 9 (IMPLEMENTED) — Conversational Quoting (Groq) & Volume Catalog Pricing
 
+> **Status: signed off & IMPLEMENTED 2026-05-26.** Code merged, migration 0002
+> applied, catalog repriced live, 38 backend tests pass. Live Groq chat pends only
+> `GROQ_API_KEY` in `.env` (enhancement-only: without it the /custom page falls
+> back to the form). Defaults in use: `CUSTOM_GUARANTEE_FRACTION=0.6`,
+> `GROQ_MODEL=llama-3.3-70b-versatile` (tune in `.env`).
+
+### 15.1 Why
+
+Under-delivery on custom orders is the main post-payment conflict risk. A
+Groq-backed chat assistant gives the customer an honest quote — a **guaranteed
+minimum lead count + price** — *before* they pay, and quietly routes any request
+we can already fill from the catalog into **instant delivery**. Catalog packs are
+pre-made and resold with ~zero marginal cost (S3 + email), so they move to thin
+**volume pricing** to drive conversion. Decisions locked with Nayyer 2026-05-26:
+guaranteed-minimum quoting, lower all catalog prices toward cost, spec-first.
+
+### 15.2 Non-negotiable guardrails (extend §1)
+
+1. **The LLM never originates money or counts.** Prices, lead counts, guaranteed
+   minimums, and catalog matches are computed **server-side** and handed to the
+   model as structured data; the model only converses and phrases. Any price/count
+   in model free-text that doesn't match a server-issued quote is ignored.
+2. **Quotes are server-authoritative and locked.** A quote is persisted with an id
+   and `expires_at`; orders are created by referencing that quote id (idempotent).
+   The customer cannot change price/terms by editing the chat.
+3. **Groq is an enhancement, not a dependency.** If `GROQ_API_KEY` is absent,
+   rate-limited, or erroring, the UI falls back to the existing `/custom` form and
+   `/packs`. The assistant never blocks a sale.
+4. **All model output is untrusted** (prompt-injection): only validated structured
+   tool-calls cause side effects; free text never executes actions.
+5. **Minimize PII to Groq:** send only the requirement text + conversation, never
+   the customer DB. Disclose third-party processing (Groq, US) in privacy copy.
+6. **Groq SDK / OpenAI-compatible HTTP only. No LangChain / agent frameworks**
+   (Rule #2 still holds).
+
+### 15.3 Flow
+
+```
+Customer describes need in chat (Groq)
+        │  model extracts {city, vertical, count_wanted, notes}
+        ▼
+Backend checks catalog for a match (server-side)
+        │
+   ┌────┴───────────────────────────┐
+   ▼ match found                     ▼ no match (true custom)
+ server issues CATALOG quote:       server issues CUSTOM quote:
+ 3-row preview + firm price         guaranteed_min + likely range,
+ ("we have this ready for you")     price = §Phase-5 formula on the floor,
+        │                           "up to N; you pay for the floor"
+        ▼                                   │
+ accept → instant-delivery order     accept → scrape-on-pay order
+        └───────────────┬───────────────────┘
+                        ▼
+            existing PayPro create_invoice + fulfillment
+```
+
+### 15.4 Guaranteed-minimum estimator (custom)
+
+Estimate sources, in priority order:
+1. Historical delivered counts for the same city+vertical (`orders` / `apify_runs`).
+2. A seed heuristic table (**CONFIRM** initial values — we currently have real data
+   for ~1 query: Karachi DHA/Clifton restaurants ≈ 136).
+3. Conservative default: `guaranteed_min = round(count_wanted * CUSTOM_GUARANTEE_FRACTION)`
+   (**CONFIRM** fraction ≈ 0.6), capped by the estimate.
+
+Output `{guaranteed_min, likely_low, likely_high}`. Price = custom formula
+(`CUSTOM_ORDER_BASE_PKR + CUSTOM_ORDER_PER_LEAD_PKR * guaranteed_min`). Persist the
+estimate alongside the eventual delivered count so accuracy improves over time.
+Early quotes are deliberately conservative.
+
+### 15.5 Refund-on-miss
+
+Order stores `guaranteed_min_leads`; after scrape, `delivered_leads` is recorded.
+If `delivered_leads < guaranteed_min_leads`, the system computes
+`refund_due_pkr = CUSTOM_ORDER_PER_LEAD_PKR * (guaranteed_min - delivered)`, sets it
+on the order, and notifies Nayyer. **Execution stays manual** via the PayPro
+dashboard + DB update (refund automation is deferred, §13). The customer keeps all
+delivered leads regardless.
+
+### 15.6 Volume catalog pricing (lower toward cost) — NUMBERS CONFIRMED 2026-05-26
+
+Catalog packs are resold; per-sale marginal cost ≈ 0 (the ~PKR 2.4/lead production
+cost is one-time and recouped on the first sale). Reprice low for volume.
+Rule (**confirmed**): `price_pkr = max(CATALOG_MIN_PRICE_PKR,
+round_to_×99(lead_count * CATALOG_PKR_PER_LEAD))` with **`CATALOG_PKR_PER_LEAD = 6`**,
+**`CATALOG_MIN_PRICE_PKR = 1999`**. A one-off script updates `packs.price_pkr`;
+`seed_catalog.py` adopts the rule. **Final repriced 10-pack table (apply on Phase 9
+build, or sooner if Nayyer says go):**
+
+| Slug | Leads | Old | New |
+|---|---|---|---|
+| karachi-restaurants-dha | 500 | 3999 | 2999 |
+| karachi-dental-clinics | 400 | 3999 | 2399 |
+| karachi-schools-private | 600 | 4499 | 3599 |
+| karachi-real-estate | 500 | 4499 | 2999 |
+| lahore-salons-spas | 750 | 4999 | 4499 |
+| lahore-wedding-venues | 500 | 5499 | 2999 |
+| lahore-gyms-fitness | 400 | 3999 | 2399 |
+| islamabad-real-estate | 400 | 3999 | 2399 |
+| islamabad-medical-clinics | 500 | 4499 | 2999 |
+| faisalabad-garment-mfg | 300 | 5999 | 1999 |
+
+Total 45,990 → 29,290 (−36%).
+
+### 15.7 Env additions (§5 delta — apply on approval)
+
+```bash
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile      # free tier; CONFIRM model
+GROQ_BASE_URL=https://api.groq.com/openai/v1
+ASSISTANT_ENABLED=true                  # master switch; off → fallback UI
+CUSTOM_GUARANTEE_FRACTION=0.6           # CONFIRM
+CATALOG_PKR_PER_LEAD=6                  # confirmed 2026-05-26
+CATALOG_MIN_PRICE_PKR=1999              # confirmed 2026-05-26
+```
+
+### 15.8 Schema additions (§6 delta — apply on approval)
+
+- **`quotes`**: `id, kind (catalog|custom), pack_id?, city, vertical, count_wanted,
+  guaranteed_min, likely_low, likely_high, price_pkr, preview JSONB, status
+  (open|accepted|expired), created_at, expires_at`.
+- **`orders`** add: `quote_id UUID NULL`, `guaranteed_min_leads INT NULL`,
+  `delivered_leads INT NULL`, `refund_due_pkr INT NULL`.
+- **`lead_density_stats`** (optional, for the estimator): `city, vertical, samples,
+  last_count, updated_at`.
+
+### 15.9 Modules / endpoints
+
+- `app/integrations/llm.py` — `GroqClient` (chat + `extract_intent`); thin wrapper.
+- `app/api/assistant.py` — `POST /api/assistant/chat` (history → reply + optional
+  server-issued quote); `POST /api/assistant/quote/{id}/accept` → creates an order
+  via the existing `orders` + PayPro flow.
+- Frontend: chat widget on `/` and `/custom`; renders a quote card (preview rows +
+  price + CTA). Degrades to the plain form when `ASSISTANT_ENABLED=false`.
+
+### 15.10 Acceptance criteria
+
+- Intent extraction maps free text → `{city, vertical, count}`.
+- Catalog match returns a 3-row preview + firm price; accept → instant-delivery order.
+- Custom returns a guaranteed-minimum quote; price = formula on the floor; **a
+  tampered model price is rejected** (LLM never originates money — explicit test).
+- Under-delivery sets `refund_due_pkr` and flags Nayyer; leads still delivered.
+- `GROQ_API_KEY` unset → graceful fallback to `/custom` + `/packs` (no 500s).
+- Volume repricing applied; `/packs` reflects new prices.
+
+---
+
+## 16. Change Log
+
+- `2026-05-26` — **Phase 9 IMPLEMENTED (§15).** Groq conversational quoting +
+  volume catalog pricing built and verified. Backend: migration `0002` (quotes,
+  lead_density_stats, order quote/refund columns); `app/integrations/llm.py`
+  (httpx Groq wrapper, JSON-mode, no LangChain); `app/services/quoting.py`
+  (server-authoritative catalog-match + guaranteed-minimum estimator + volume
+  catalog price rule); `app/api/assistant.py` (`/assistant/status|chat|quote/{id}/
+  accept`); refund-on-miss + density learning in `scrape.py`. Frontend:
+  `ChatAssistant.tsx` (chat → quote card → accept→pay), wired into `/custom`,
+  falls back to the form when the assistant is off. Catalog **repriced live** to
+  the §15.6 table (45,990→29,290). 38 backend tests pass (incl. the guardrail test:
+  order amount always = server quote price, never the client). **Pending:** Nayyer
+  adds `GROQ_API_KEY` for live chat; full chat→pay e2e also pends PayPro. NOTE:
+  `karachi-restaurants-dha` is priced 2,999 (its 500-lead target) but only holds
+  136 real leads — confirm whether to keep 2,999 or drop to the 136-lead rule price
+  (1,999). Pre-existing stale `test_estimate_cost` updated to the calibrated
+  $0.0085/lead.
+- `2026-05-26` — **Phase 9 PROPOSED (§15):** Groq-backed conversational quoting +
+  volume catalog pricing. Decisions locked with Nayyer: custom quotes give a
+  **guaranteed minimum + range** (charge the floor, extras free, auto-computed
+  partial refund if missed — execution still manual per §13); **lower all catalog
+  prices toward cost** (volume play); **spec-first** (this section), no code until
+  sign-off. Hard guardrail: the LLM never originates prices/counts — all money/
+  counts are server-computed and locked in a `quotes` row; Groq is enhancement-only
+  with form fallback; no LangChain (Rule #2). Open **CONFIRM** items: catalog
+  repricing numbers, guarantee fraction, Groq model.
+- `2026-05-26` — **Custom pricing finalized (Nayyer):** `CUSTOM_ORDER_BASE_PKR=4999`,
+  `CUSTOM_ORDER_PER_LEAD_PKR=8`, `MAX_LEADS_PER_CUSTOM_ORDER=1000` (8/lead keeps
+  ≥70% margin at the cap vs ~PKR 2.4/lead Apify cost; 1,000 leads = PKR 12,999 =
+  top of the §0 band). Under-delivery policy = **"up to N"** (deliver what Google
+  Maps has, no refund). Applied to `config.py`, `.env`/`.env.example`,
+  `CustomOrderForm.tsx` (+"up to N" copy) and `test_custom.py`; backend+frontend
+  rebuilt & verified live (300→7,399 / 1000→12,999; over-max→400). Custom checkout
+  now only pends PayPro Bill-Creation entitlement.
+- `2026-05-26` — **S3 public access live.** DNS A record
+  `s3.leadkar.engstech.com → VPS` added (cPanel); installed
+  `nginx/s3.leadkar.engstech.com.conf` into host nginx (proxies →MinIO :9000,
+  preserves Host so presigned sigs validate) + `certbot` cert (expires 2026-08-24).
+  PUBLIC presigned download verified end-to-end (HTTP 200, 136-lead Karachi CSV).
+  The `karachi-restaurants-dha` pack is now genuinely deliverable.
 - `2026-05-25` — **Went live at `https://leadkar.engstech.com`.** Added a cPanel
   DNS A record → VPS, installed the nginx vhost into the shared host nginx
   (`/etc/nginx/sites-enabled/`), and issued a Let's Encrypt cert via

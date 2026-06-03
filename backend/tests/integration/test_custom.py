@@ -48,7 +48,9 @@ async def client():
 
 
 def test_compute_custom_amount():
-    assert compute_custom_amount(300) == settings.CUSTOM_ORDER_BASE_PKR + 3 * 300
+    assert compute_custom_amount(300) == (
+        settings.CUSTOM_ORDER_BASE_PKR + settings.CUSTOM_ORDER_PER_LEAD_PKR * 300
+    )
 
 
 async def test_create_custom_order(client):
@@ -116,7 +118,7 @@ async def paid_custom_order():
         await s.flush()
         order = Order(
             customer_id=cust.id, order_type=OrderType.custom, status=OrderStatus.paid,
-            amount_pkr=5899, idempotency_key=str(uuid.uuid4()),
+            amount_pkr=7399, idempotency_key=str(uuid.uuid4()),
             custom_spec={"city": "Lahore", "vertical": "salons", "target_count": 300},
         )
         s.add(order)

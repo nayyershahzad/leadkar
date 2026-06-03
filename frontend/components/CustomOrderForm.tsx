@@ -9,8 +9,8 @@ import { formatPKR } from "@/lib/utils";
 // Estimate only — the authoritative price is computed by the backend at order
 // creation. Keep in sync with CUSTOM_ORDER_BASE_PKR / PER_LEAD_PKR.
 const BASE_PKR = Number(process.env.NEXT_PUBLIC_CUSTOM_BASE_PKR ?? 4999);
-const PER_LEAD_PKR = Number(process.env.NEXT_PUBLIC_CUSTOM_PER_LEAD_PKR ?? 3);
-const MAX_LEADS = Number(process.env.NEXT_PUBLIC_MAX_LEADS ?? 2500);
+const PER_LEAD_PKR = Number(process.env.NEXT_PUBLIC_CUSTOM_PER_LEAD_PKR ?? 8);
+const MAX_LEADS = Number(process.env.NEXT_PUBLIC_MAX_LEADS ?? 1000);
 
 export function CustomOrderForm() {
   const [loading, setLoading] = useState(false);
@@ -66,7 +66,7 @@ export function CustomOrderForm() {
       </div>
 
       <div>
-        <Label htmlFor="count">Number of leads * (max {MAX_LEADS.toLocaleString()})</Label>
+        <Label htmlFor="count">Number of leads * (up to {MAX_LEADS.toLocaleString()})</Label>
         <Input
           id="count"
           type="number"
@@ -76,6 +76,10 @@ export function CustomOrderForm() {
           value={spec.target_count}
           onChange={(e) => setSpec({ ...spec, target_count: Number(e.target.value) })}
         />
+        <p className="mt-1 text-xs text-slate-500">
+          We deliver up to this many verified leads. Some niches or smaller cities
+          may have fewer businesses listed on Google Maps — you’ll get every one we find.
+        </p>
       </div>
 
       <div>

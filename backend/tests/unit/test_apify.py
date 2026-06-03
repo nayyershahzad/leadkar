@@ -20,8 +20,8 @@ def test_build_gmaps_input_divides_target_across_searches():
 
 def test_estimate_cost():
     client = ApifyClient()  # no token / session needed for estimate
-    payload = build_gmaps_input(["a", "b"], 500)  # 250 * 2 * 0.005
-    assert client.estimate_cost("actor", payload) == Decimal("2.5000")
+    payload = build_gmaps_input(["a", "b"], 500)  # 250 * 2 * 0.0085 (calibrated)
+    assert client.estimate_cost("actor", payload) == Decimal("4.2500")
 
 
 async def test_trigger_run_aborts_when_estimate_exceeds_cap():

@@ -67,10 +67,30 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "LeadKar"
 
     # Custom order pricing (PKR). amount = base + per_lead * target_count.
-    # Defaults derived from §0 (PKR 4,999–12,999); confirm with Nayyer.
+    # Finalized with Nayyer 2026-05-26: base 4,999 + 8/lead, max 1,000 leads
+    # (keeps margin ≥70% at the cap and 1,000 leads = 12,999 = top of the §0 band).
     CUSTOM_ORDER_BASE_PKR: int = 4999
-    CUSTOM_ORDER_PER_LEAD_PKR: int = 3
-    MAX_LEADS_PER_CUSTOM_ORDER: int = 2500
+    CUSTOM_ORDER_PER_LEAD_PKR: int = 8
+    MAX_LEADS_PER_CUSTOM_ORDER: int = 1000
+
+    # Groq conversational assistant (Phase 9 §15). Enhancement-only: with no
+    # GROQ_API_KEY (or ASSISTANT_ENABLED=false) the chat degrades to the plain
+    # /custom form + /packs — it must never block a sale (§15.2 guardrail #3).
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_TIMEOUT_SECONDS: int = 20
+    ASSISTANT_ENABLED: bool = True
+
+    # Custom guaranteed-minimum quoting (§15.4): the conservative floor we promise
+    # when we have no density history, as a fraction of the requested count.
+    CUSTOM_GUARANTEE_FRACTION: float = 0.6
+    QUOTE_TTL_MINUTES: int = 60
+
+    # Volume catalog pricing (§15.6, confirmed 2026-05-26): low headline price to
+    # drive volume. price = max(MIN, round_to_×99(lead_count * PER_LEAD)).
+    CATALOG_PKR_PER_LEAD: int = 6
+    CATALOG_MIN_PRICE_PKR: int = 1999
 
     # Apify
     APIFY_API_TOKEN: str = ""

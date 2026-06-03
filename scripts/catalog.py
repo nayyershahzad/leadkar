@@ -30,7 +30,9 @@ CATALOG: dict[str, PackSpec] = {
             "Karachi",
             "restaurants",
             500,
-            3999,
+            2999,  # §15.6 target price (500 leads). LIVE pack holds 136 leads, so
+            #        its DB price was set to the 136-lead rule price (1999) on
+            #        2026-05-26 until the pack is topped up toward 500.
             [
                 "restaurants in DHA Phase 2 Karachi",
                 "restaurants in DHA Phase 5 Karachi",
@@ -48,7 +50,7 @@ CATALOG: dict[str, PackSpec] = {
             "Karachi",
             "dental_clinics",
             400,
-            3999,
+            2399,
             [
                 "dental clinics in DHA Karachi",
                 "dental clinics in Clifton Karachi",
@@ -63,7 +65,7 @@ CATALOG: dict[str, PackSpec] = {
             "Karachi",
             "schools",
             600,
-            4499,
+            3599,
             [
                 "private schools in DHA Karachi",
                 "private schools in Gulshan-e-Iqbal Karachi",
@@ -78,7 +80,7 @@ CATALOG: dict[str, PackSpec] = {
             "Karachi",
             "real_estate",
             500,
-            4499,
+            2999,
             [
                 "real estate agencies in DHA Karachi",
                 "real estate agencies in Clifton Karachi",
@@ -92,7 +94,7 @@ CATALOG: dict[str, PackSpec] = {
             "Lahore",
             "salons",
             750,
-            4999,
+            4499,
             [
                 "salons in DHA Lahore",
                 "salons in Gulberg Lahore",
@@ -107,7 +109,7 @@ CATALOG: dict[str, PackSpec] = {
             "Lahore",
             "wedding",
             500,
-            5499,
+            2999,
             [
                 "wedding venues in DHA Lahore",
                 "marquees in Lahore",
@@ -121,7 +123,7 @@ CATALOG: dict[str, PackSpec] = {
             "Lahore",
             "gyms",
             400,
-            3999,
+            2399,
             [
                 "gyms in DHA Lahore",
                 "gyms in Gulberg Lahore",
@@ -135,7 +137,7 @@ CATALOG: dict[str, PackSpec] = {
             "Islamabad",
             "real_estate",
             400,
-            3999,
+            2399,
             [
                 "real estate agencies in F-7 Islamabad",
                 "real estate agencies in F-10 Islamabad",
@@ -149,7 +151,7 @@ CATALOG: dict[str, PackSpec] = {
             "Islamabad",
             "medical_clinics",
             500,
-            4499,
+            2999,
             [
                 "medical clinics in F-8 Islamabad",
                 "clinics in Blue Area Islamabad",
@@ -163,7 +165,7 @@ CATALOG: dict[str, PackSpec] = {
             "Faisalabad",
             "garment_mfg",
             300,
-            5999,
+            1999,
             [
                 "garment manufacturers in Faisalabad",
                 "textile manufacturers in Faisalabad",

@@ -17,13 +17,38 @@ _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 _IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp")
 _PATHS = ("", "/contact", "/contact-us", "/about")
 
+# Junk the regex commonly grabs from template/demo copy and JS error trackers —
+# none of these are real outreach addresses, so drop them.
+_PLACEHOLDER_DOMAINS = (
+    "example.com", "example.org", "example.net", "domain.com", "yourdomain.com",
+    "test.com", "email.com", "sentry.io",
+)
+_PLACEHOLDER_LOCALS = (
+    "user", "your", "youremail", "your-email", "email", "name", "yourname",
+    "someone", "example", "test", "username", "firstname", "lastname", "abc",
+)
+_TRACKING_SUFFIXES = (".wixpress.com", ".sentry.io")
+
+
+def _is_placeholder(email: str) -> bool:
+    local, _, domain = email.lower().partition("@")
+    return (
+        domain in _PLACEHOLDER_DOMAINS
+        or local in _PLACEHOLDER_LOCALS
+        or any(domain.endswith(s) for s in _TRACKING_SUFFIXES)
+    )
+
 
 def extract_emails(html: str) -> list[str]:
-    """Return de-duplicated, plausible emails from HTML (drops image artifacts)."""
+    """Return de-duplicated, plausible emails from HTML.
+
+    Drops image-file artifacts (``logo@2x.png``) and template/tracker placeholders
+    (``user@domain.com``, ``*@sentry.io``, ``*.wixpress.com``).
+    """
     seen: list[str] = []
     for match in _EMAIL_RE.findall(html or ""):
         low = match.lower()
-        if low.endswith(_IMG_EXTS) or low in (s.lower() for s in seen):
+        if low.endswith(_IMG_EXTS) or _is_placeholder(match) or low in (s.lower() for s in seen):
             continue
         seen.append(match)
     return seen

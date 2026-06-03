@@ -25,6 +25,7 @@ from app.integrations.exporters import (
 from app.integrations.normalize import normalize_dataset
 from app.integrations.storage import S3Storage
 from app.models.order import Order, OrderStatus, OrderType
+from app.services.quoting import record_density
 from app.tasks.celery_app import celery_app
 from app.tasks.enrich import enrich_emails
 
@@ -94,6 +95,21 @@ async def _scrape(order_id: UUID, *, make_apify=None, storage=None) -> str:
         storage.put_bytes(xlsx_key, to_xlsx_bytes(rows), XLSX_CONTENT_TYPE)
         order.delivery_s3_csv = csv_key
         order.delivery_s3_xlsx = xlsx_key
+
+        # Phase 9 §15.5: record what we actually delivered, flag a refund if we
+        # missed the guaranteed minimum, and feed the density estimator (§15.4).
+        delivered = len(rows)
+        order.delivered_leads = delivered
+        if order.guaranteed_min_leads and delivered < order.guaranteed_min_leads:
+            shortfall = order.guaranteed_min_leads - delivered
+            order.refund_due_pkr = settings.CUSTOM_ORDER_PER_LEAD_PKR * shortfall
+            logger.warning(
+                "Order {} under guarantee: delivered {} < {} → refund_due PKR {} "
+                "(manual via PayPro, §13)",
+                order_id, delivered, order.guaranteed_min_leads, order.refund_due_pkr,
+            )
+        if city and vertical:
+            await record_density(session, city, vertical, delivered)
 
         if result.status != "SUCCEEDED":
             order.status = OrderStatus.failed

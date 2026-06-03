@@ -1,4 +1,4 @@
-import { CustomOrderForm } from "@/components/CustomOrderForm";
+import { ChatAssistant } from "@/components/ChatAssistant";
 
 export const metadata = { title: "Custom lead order — LeadKar" };
 
@@ -16,15 +16,15 @@ export default function CustomPage() {
             Your niche, <span className="text-gradient">scraped on demand</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-lg text-slate-600">
-            Pick a city, business type, and how many leads you need. We scrape and verify them,
-            then email your CSV + XLSX — usually within 24 hours.
+            Tell us your city, business type, and how many leads you need. We will quote you
+            on the spot — then scrape, verify, and email your CSV + XLSX.
           </p>
         </div>
       </section>
 
       <section className="container max-w-2xl pb-20">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <CustomOrderForm />
+          <ChatAssistant />
         </div>
       </section>
     </>

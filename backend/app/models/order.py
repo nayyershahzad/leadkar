@@ -61,6 +61,14 @@ class Order(Base):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     failed_reason: Mapped[str | None] = mapped_column(Text)
+    # Phase 9 (§15): the locked quote this order came from, plus guaranteed-minimum
+    # bookkeeping for the refund-on-miss path.
+    quote_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quotes.id")
+    )
+    guaranteed_min_leads: Mapped[int | None] = mapped_column(Integer)
+    delivered_leads: Mapped[int | None] = mapped_column(Integer)
+    refund_due_pkr: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
