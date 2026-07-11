@@ -419,8 +419,10 @@ CREATE UNIQUE INDEX idx_paypro_events_dedup
 > - **Webhooks:** PayPro PK does **not** sign or document a webhook — see Rule #5.
 >   `verify_webhook_signature` is removed; payment is confirmed via the status API.
 > - **Auth needs a username:** `PAYPRO_USERNAME` (MerchantId, e.g. `Engs_Tech`).
-> - PKR amount mapping (`CurrencyAmount`/`IsConverted=false`) has no doc example;
->   confirm on the first real sandbox order.
+> - **PKR amount mapping CONFIRMED (2026-06-04) against the demo API:** the create-order
+>   body uses a flat **`OrderAmount`** (PKR, as a string) plus an optional **`Description`**.
+>   The earlier `CurrencyAmount`/`Currency`/`IsConverted` shape is now **rejected**
+>   (`Status=03 "Invalid json object!"`). `create_invoice` updated accordingly.
 
 **Note to Claude Code:** the original generic interface below predates the
 confirmed spec. Wrap all PayPro interaction inside `app/integrations/paypro.py`
@@ -1003,6 +1005,18 @@ CATALOG_MIN_PRICE_PKR=1999              # confirmed 2026-05-26
 
 ## 16. Change Log
 
+- `2026-06-04` — **PayPro create-order payload fixed + live demo order created.**
+  PayPro supplied a new create-order body shape; tested against the demo base and
+  confirmed: the body now uses a flat **`OrderAmount`** (PKR string) + optional
+  **`Description`**, replacing `CurrencyAmount`/`Currency`/`IsConverted` (the old
+  shape now returns `Status=03 "Invalid json object!"`). Updated `create_invoice`
+  in `app/integrations/paypro.py` (sends `OrderAmount` + the existing `description`
+  param as `Description`), rebuilt the backend image, and verified the real code
+  path end-to-end on demo: `create_invoice` → `Status=00`, `PayProId`, working
+  `Click2Pay` URL. **Bill-Creation entitlement now works on demo** (was the
+  long-standing blocker). Unit tests in `test_paypro.py` mock responses and don't
+  assert field names, so unaffected. Auth confirmed: token in `token` response
+  header, `tokenexpiry=1440` (min).
 - `2026-05-26` — **Phase 9 IMPLEMENTED (§15).** Groq conversational quoting +
   volume catalog pricing built and verified. Backend: migration `0002` (quotes,
   lead_density_stats, order quote/refund columns); `app/integrations/llm.py`

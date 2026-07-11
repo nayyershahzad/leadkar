@@ -42,8 +42,9 @@ FAILED_STATUSES = {"blocked", "expired", "cancelled", "canceled"}
 # PayPro envelope status: element 0 is {"Status": "00"} on success.
 F_ENVELOPE_STATUS = "Status"
 OK_STATUS = "00"
-# TODO(confirm on first sandbox order): no PKR example in the docs — we send
-# Currency=PKR, IsConverted=false, amount in CurrencyAmount.
+# Confirmed against the demo API (2026-06-04): the create-order body uses a flat
+# "OrderAmount" (PKR) field. The earlier CurrencyAmount/Currency/IsConverted shape
+# is now rejected with Status=03 "Invalid json object!".
 ORDER_TYPE = "Service"
 # ============================================================================
 
@@ -202,17 +203,16 @@ class PayProClient:
             {"MerchantId": merchant_id},
             {
                 "OrderNumber": order_number,
-                "CurrencyAmount": str(amount_pkr),
-                "Currency": "PKR",
-                "IsConverted": "false",
+                "OrderDueDate": _ddmmyyyy(now + timedelta(days=settings.PAYPRO_ORDER_DUE_DAYS)),
+                "OrderAmount": str(amount_pkr),
                 "OrderType": ORDER_TYPE,
                 "IssueDate": _ddmmyyyy(now),
-                "OrderDueDate": _ddmmyyyy(now + timedelta(days=settings.PAYPRO_ORDER_DUE_DAYS)),
                 "OrderExpireAfterSeconds": "0",
                 "CustomerName": customer_name,
                 "CustomerMobile": customer_phone or "",
                 "CustomerEmail": customer_email,
                 "CustomerAddress": "",
+                "Description": description,
             },
         ]
         data = await self._authed("POST", CREATE_ORDER_PATH, body)
