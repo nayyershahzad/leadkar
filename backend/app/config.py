@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     # GROQ_API_KEY (or ASSISTANT_ENABLED=false) the chat degrades to the plain
     # /custom form + /packs — it must never block a sale (§15.2 guardrail #3).
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
     GROQ_TIMEOUT_SECONDS: int = 20
     ASSISTANT_ENABLED: bool = True
