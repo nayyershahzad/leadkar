@@ -26,6 +26,7 @@ from app.integrations.normalize import normalize_dataset
 from app.integrations.storage import S3Storage
 from app.models.order import Order, OrderStatus, OrderType
 from app.services.quoting import record_density
+from app.services.scoring import score_and_rank
 from app.tasks.celery_app import celery_app
 from app.tasks.enrich import enrich_emails
 
@@ -87,6 +88,9 @@ async def _scrape(order_id: UUID, *, make_apify=None, storage=None) -> str:
             rows = await enrich_emails(rows)
         except Exception as exc:  # noqa: BLE001 — enrichment is best-effort
             logger.warning("Enrichment failed (continuing): {}", exc)
+        # Score + tag + sort best-first (Wave 1); runs after enrichment so the
+        # email-contactability points are counted.
+        rows = score_and_rank(rows)
         run_row.results_count = len(rows)
 
         csv_key = f"orders/{order.id}/leads.csv"

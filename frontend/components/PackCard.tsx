@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { type Pack } from "@/lib/api";
+import { packStats, type Pack } from "@/lib/api";
 import { formatPKR, prettify } from "@/lib/utils";
+import { QualityChips } from "@/components/QualityStats";
 
 export function PackCard({ pack }: { pack: Pack }) {
+  const stats = packStats(pack);
   return (
     <Link
       href={`/packs/${pack.slug}`}
@@ -21,6 +23,7 @@ export function PackCard({ pack }: { pack: Pack }) {
       <p className="mt-1 text-sm font-medium text-slate-500">
         {pack.lead_count.toLocaleString()} verified leads
       </p>
+      {stats ? <QualityChips stats={stats} /> : null}
       {pack.description ? (
         <p className="mt-2 line-clamp-2 flex-1 text-sm text-slate-500">{pack.description}</p>
       ) : (

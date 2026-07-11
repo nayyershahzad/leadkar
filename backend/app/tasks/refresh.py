@@ -25,6 +25,7 @@ from app.integrations.exporters import (
 from app.integrations.normalize import normalize_dataset
 from app.integrations.storage import S3Storage
 from app.models.pack import Pack
+from app.services.scoring import build_sample_preview, score_and_rank
 from app.tasks.celery_app import celery_app
 
 
@@ -54,6 +55,7 @@ async def _refresh() -> str:
 
             scraped_at = (run.started_at or datetime.now(timezone.utc)).isoformat()
             rows = normalize_dataset(items, scraped_at)
+            rows = score_and_rank(rows)
             run.status = result.status
             run.cost_usd = result.cost_usd
             run.results_count = len(rows)
@@ -66,7 +68,7 @@ async def _refresh() -> str:
 
             pack.s3_key_csv = csv_key
             pack.s3_key_xlsx = xlsx_key
-            pack.sample_preview = {"rows": rows[:3]}
+            pack.sample_preview = build_sample_preview(rows)
             pack.last_refreshed_at = datetime.now(timezone.utc)
             refreshed += 1
 

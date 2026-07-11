@@ -4,12 +4,14 @@ import { Check, Mail, Phone } from "lucide-react";
 
 import { BuyButton } from "@/components/BuyButton";
 import { PricingTable } from "@/components/PricingTable";
-import { getPack } from "@/lib/api";
+import { QualitySummary } from "@/components/QualityStats";
+import { getPack, packStats } from "@/lib/api";
 import { formatPKR, prettify } from "@/lib/utils";
 
 export default async function PackDetailPage({ params }: { params: { slug: string } }) {
   const pack = await getPack(params.slug);
   if (!pack) notFound();
+  const stats = packStats(pack);
 
   return (
     <div className="container py-10">
@@ -31,6 +33,12 @@ export default async function PackDetailPage({ params }: { params: { slug: strin
             {pack.lead_count.toLocaleString()} verified leads
           </p>
           {pack.description ? <p className="mt-4 text-slate-700">{pack.description}</p> : null}
+
+          {stats ? (
+            <div className="mt-8">
+              <QualitySummary stats={stats} />
+            </div>
+          ) : null}
 
           <h2 className="mt-10 text-lg font-bold text-slate-900">Sample preview</h2>
           <div className="mt-3">

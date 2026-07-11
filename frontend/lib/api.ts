@@ -3,6 +3,16 @@
 
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL || "http://backend:8000";
 
+export interface PackStats {
+  lead_count: number;
+  avg_lead_score: number;
+  pct_whatsapp: number;
+  pct_email: number;
+  pct_phone: number;
+  pct_website: number;
+  hidden_gems: number;
+}
+
 export interface Pack {
   id: string;
   slug: string;
@@ -12,7 +22,10 @@ export interface Pack {
   lead_count: number;
   price_pkr: number;
   description: string | null;
-  sample_preview: { rows?: Record<string, unknown>[] } | Record<string, unknown>[] | null;
+  sample_preview:
+    | { rows?: Record<string, unknown>[]; stats?: PackStats }
+    | Record<string, unknown>[]
+    | null;
   last_refreshed_at: string | null;
 }
 
@@ -54,4 +67,11 @@ export function sampleRows(pack: Pack): Record<string, unknown>[] {
   if (Array.isArray(sp)) return sp.slice(0, 3);
   if (Array.isArray(sp.rows)) return sp.rows.slice(0, 3);
   return [];
+}
+
+/** Pack-level quality summary (Wave 1). Present once a pack has been scored. */
+export function packStats(pack: Pack): PackStats | null {
+  const sp = pack.sample_preview;
+  if (!sp || Array.isArray(sp) || !sp.stats) return null;
+  return sp.stats;
 }

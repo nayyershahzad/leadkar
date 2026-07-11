@@ -12,9 +12,11 @@ def _row(**kw):
 def test_to_csv_bytes_has_header_and_rows():
     data = to_csv_bytes([_row(name="A", city="Karachi"), _row(name="B")])
     text = data.decode("utf-8")
-    assert text.splitlines()[0].startswith("name,category,address,city")
-    assert "A,,,Karachi" in text.replace("\r", "")
-    assert "B," in text
+    header = text.splitlines()[0]
+    # lead_score + signal_tags lead the canonical order (Wave 1).
+    assert header.startswith("lead_score,signal_tags,name,category,address,city")
+    assert ",A,," in text.replace("\r", "")
+    assert ",B," in text
 
 
 def test_to_xlsx_bytes_is_nonempty_zip():
